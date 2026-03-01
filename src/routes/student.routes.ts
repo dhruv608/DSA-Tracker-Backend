@@ -108,28 +108,6 @@ router.use(verifyToken, isStudent);
 // Body: {} (empty or optional metadata)
 // Marks question as solved (creates record in StudentProgress)
 
-router.delete("/questions/:questionId/solve", async (req, res) => {
-  // Usage: DELETE /api/student/questions/1/solve
-  // Unmarks question as solved (deletes from StudentProgress)
-  // For accidental marks or testing
-  try {
-    const { questionId } = req.params;
-    const studentId = req.user!.id;
-
-    await prisma.studentProgress.delete({
-      where: {
-        student_id_question_id: {
-          student_id: studentId,
-          question_id: parseInt(questionId)
-        }
-      }
-    });
-
-    res.json({ message: "Question unmarked as solved" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to unmark question" });
-  }
-});
 
 // ==========================================
 // 📊 PROGRESS TRACKING
@@ -293,53 +271,53 @@ router.delete("/questions/:questionId/solve", async (req, res) => {
 // 🔍 SEARCH & FILTERS
 // ==========================================
 
-router.get("/questions/search", async (req, res) => {
-  // Usage: GET /api/student/questions/search?q=two%20sum
-  // Searches questions by name
-  try {
-    const { q } = req.query;
-    const studentId = req.user!.id;
+// router.get("/questions/search", async (req, res) => {
+//   // Usage: GET /api/student/questions/search?q=two%20sum
+//   // Searches questions by name
+//   try {
+//     const { q } = req.query;
+//     const studentId = req.user!.id;
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      select: { batch_id: true }
-    });
+//     const student = await prisma.student.findUnique({
+//       where: { id: studentId },
+//       select: { batch_id: true }
+//     });
 
-    if (!student?.batch_id) {
-      return res.status(400).json({ error: "Please complete your profile first" });
-    }
+//     if (!student?.batch_id) {
+//       return res.status(400).json({ error: "Please complete your profile first" });
+//     }
 
-    const questions = await prisma.question.findMany({
-      where: {
-        question_name: {
-          contains: q as string,
-          mode: 'insensitive'
-        },
-        visibility: {
-          some: {
-            batch_id: student.batch_id
-          }
-        }
-      },
-      include: {
-        topic: true,
-        progress: {
-          where: { student_id: studentId }
-        }
-      },
-      take: 20
-    });
+//     const questions = await prisma.question.findMany({
+//       where: {
+//         question_name: {
+//           contains: q as string,
+//           mode: 'insensitive'
+//         },
+//         visibility: {
+//           some: {
+//             batch_id: student.batch_id
+//           }
+//         }
+//       },
+//       include: {
+//         topic: true,
+//         progress: {
+//           where: { student_id: studentId }
+//         }
+//       },
+//       take: 20
+//     });
 
-    const questionsWithStatus = questions.map(q => ({
-      ...q,
-      is_solved: q.progress.length > 0
-    }));
+//     const questionsWithStatus = questions.map(q => ({
+//       ...q,
+//       is_solved: q.progress.length > 0
+//     }));
 
-    res.json({ questions: questionsWithStatus });
-  } catch (error) {
-    res.status(500).json({ error: "Search failed" });
-  }
-});
+//     res.json({ questions: questionsWithStatus });
+//   } catch (error) {
+//     res.status(500).json({ error: "Search failed" });
+//   }
+// });
 
 // ==========================================
 // 📈 ANALYTICS (Student's own data)
@@ -414,54 +392,54 @@ router.get("/analytics/monthly", async (req, res) => {
 // 🎯 PENDING/UPCOMING
 // ==========================================
 
-router.get("/questions/pending", async (req, res) => {
-  // Usage: GET /api/student/questions/pending
-  // Returns: Questions assigned but not yet solved
-  try {
-    const studentId = req.user!.id;
+// router.get("/questions/pending", async (req, res) => {
+//   // Usage: GET /api/student/questions/pending
+//   // Returns: Questions assigned but not yet solved
+//   try {
+//     const studentId = req.user!.id;
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      select: { batch_id: true }
-    });
+//     const student = await prisma.student.findUnique({
+//       where: { id: studentId },
+//       select: { batch_id: true }
+//     });
 
-    if (!student?.batch_id) {
-      return res.status(400).json({ error: "Please complete your profile first" });
-    }
+//     if (!student?.batch_id) {
+//       return res.status(400).json({ error: "Please complete your profile first" });
+//     }
 
-    // Get all assigned questions
-    const assignedQuestions = await prisma.question.findMany({
-      where: {
-        visibility: {
-          some: {
-            batch_id: student.batch_id
-          }
-        }
-      },
-      include: {
-        topic: true
-      }
-    });
+//     // Get all assigned questions
+//     const assignedQuestions = await prisma.question.findMany({
+//       where: {
+//         visibility: {
+//           some: {
+//             batch_id: student.batch_id
+//           }
+//         }
+//       },
+//       include: {
+//         topic: true
+//       }
+//     });
 
-    // Get solved question IDs
-    const solvedQuestionIds = await prisma.studentProgress.findMany({
-      where: { student_id: studentId },
-      select: { question_id: true }
-    }).then(items => items.map(i => i.question_id));
+//     // Get solved question IDs
+//     const solvedQuestionIds = await prisma.studentProgress.findMany({
+//       where: { student_id: studentId },
+//       select: { question_id: true }
+//     }).then(items => items.map(i => i.question_id));
 
-    // Filter out solved questions
-    const pendingQuestions = assignedQuestions.filter(
-      q => !solvedQuestionIds.includes(q.id)
-    );
+//     // Filter out solved questions
+//     const pendingQuestions = assignedQuestions.filter(
+//       q => !solvedQuestionIds.includes(q.id)
+//     );
 
-    res.json({ 
-      pending_questions: pendingQuestions,
-      count: pendingQuestions.length 
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch pending questions" });
-  }
-});
+//     res.json({ 
+//       pending_questions: pendingQuestions,
+//       count: pendingQuestions.length 
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch pending questions" });
+//   }
+// });
 
 router.get("/classes/upcoming", async (req, res) => {
   // Usage: GET /api/student/classes/upcoming

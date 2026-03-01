@@ -13,7 +13,10 @@ import {
 
 // Batch controllers
 import { 
-  createBatch, 
+  createBatch,
+  deleteBatch,
+  getAllBatches,
+  updateBatch, 
  // getAllBatches,
   //getBatchById,
   //updateBatch,
@@ -29,21 +32,28 @@ const router = Router();
 // All routes require authentication + SUPERADMIN role
 router.use(verifyToken, isSuperAdmin);
 
-// ===== CITY MANAGEMENT =====
+// ===== CITY =====
+
 router.post("/cities", createCity);
 router.get("/cities", getAllCities);
-router.patch("/cities/:slug", updateCity);
-router.delete("/cities/:slug", deleteCity);
+router.patch("/cities/:id", updateCity);
+router.delete("/cities/:id", deleteCity);
 
-// ===== BATCH MANAGEMENT =====
+// ===== BATCH =====
 router.post("/batches", createBatch);
-// router.get("/batches", getAllBatches);
-// router.get("/batches/:slug", getBatchById);
-// router.patch("/batches/:slug", updateBatch);
-// router.delete("/batches/:slug", deleteBatch);
+router.get("/batches", getAllBatches);
+router.patch("/batches/:id", updateBatch);
+router.delete("/batches/:id", deleteBatch);
+
+// ===== ADMIN =====
+
+
 
 // ===== ADMIN MANAGEMENT (Create Teachers/Interns) =====
 router.post("/admins", registerAdmin);
+// router.get("/admins", getAllAdmins);
+// router.patch("/admins/:id", updateAdmin);
+// router.delete("/admins/:id", deleteAdmin);
 
 // ===== SYSTEM STATS =====
 router.get("/stats", async (req, res) => {

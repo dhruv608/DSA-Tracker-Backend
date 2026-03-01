@@ -16,7 +16,6 @@ import {
 import { 
   // getAllBatches,
   // getBatchById,
-  getBatchesByCity 
 } from "../controllers/admin/batch.controller";
 
 // Topic controllers
@@ -86,7 +85,7 @@ router.get("/cities", getAllCities);
 // 🎓 STEP 2: SELECT BATCH IN THAT CITY
 // ==========================================
 
-router.get("/cities/:cityId/batches", getBatchesByCity);
+// router.get("/cities/:cityId/batches", getBatchesByCity);
 // Usage: GET /api/admin/cities/1/batches
 
 // router.get("/cities/:cityId/batches/:batchId", getBatchById);

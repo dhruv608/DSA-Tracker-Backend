@@ -1,6 +1,6 @@
 normal setup done 
 super admin (default create)
--> city (post , get )
+-> city (post , get ) done
 -> batch (post , get )
 -> teachers/admins (post ,get)
 
