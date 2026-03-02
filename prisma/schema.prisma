@@ -11,7 +11,7 @@ model City {
   id         Int       @id @default(autoincrement())
   city_name  String    @unique @db.VarChar(100)
   created_at DateTime  @default(now())
-  slug       String?   @unique @db.VarChar(120)
+  slug       String  @unique @db.VarChar(120)
   batches    Batch[]
   students   Student[]
 }
@@ -21,7 +21,7 @@ model Batch {
   batch_name String   @db.VarChar(50)
   year       Int
   city_id    Int
-  slug       String?  @db.VarChar(80)
+  slug       String   @unique @db.VarChar(80)
   created_at DateTime @default(now())
 
   city     City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
@@ -29,7 +29,6 @@ model Batch {
   classes  Class[]
 
   @@unique([city_id, year, batch_name])
-  @@unique([city_id, slug])
   @@index([city_id])
 }
 
@@ -75,7 +74,7 @@ model Topic {
   id         Int        @id @default(autoincrement())
   topic_name String     @unique @db.VarChar(150)
   created_at DateTime   @default(now())
-  slug       String    @unique @db.VarChar(170)
+  slug       String     @unique @db.VarChar(170)
   classes    Class[]
   questions  Question[]
 }
@@ -93,7 +92,7 @@ model Question {
   topic         Topic                @relation(fields: [topic_id], references: [id], onDelete: Cascade)
   visibility    QuestionVisibility[]
   progress      StudentProgress[]
-
+  
   @@index([topic_id])
   @@index([platform])
   @@index([level])
@@ -103,7 +102,8 @@ model Class {
   id               Int       @id @default(autoincrement())
   topic_id         Int
   batch_id         Int
-  class_number     String?   @db.VarChar(50)
+  class_name       String   @db.VarChar(50)
+  slug             String   @db.VarChar(150)
   pdf_url          String?   @db.Text
   description      String?   @db.Text
   duration_minutes Int?
@@ -114,7 +114,8 @@ model Class {
   batch              Batch                @relation(fields: [batch_id], references: [id], onDelete: Cascade)
   questionVisibility QuestionVisibility[]
 
-  @@unique([topic_id, batch_id, class_number])
+  @@unique([batch_id, slug])
+  @@unique([topic_id, batch_id, class_name])
   @@index([batch_id])
   @@index([topic_id])
 }

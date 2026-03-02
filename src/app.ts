@@ -19,7 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use("/api/students", studentRoutes);
-app.use('/api/admin', adminRoutes);              // Teacher & Intern
+app.use('/api/admin', adminRoutes);              // Teacher & Intern & admin
 app.use('/api/superadmin',superadminRoutes);    // Superadmin ONLY
 
 

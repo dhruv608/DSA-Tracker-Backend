@@ -1,10 +1,24 @@
 import { Request, Response } from "express";
-import prisma from "../../config/prisma";;
+import prisma from "../../config/prisma";
 import slugify from "slugify";
-import { generateSlug } from "../../utils/slugify";
 
 
+//  HELPER: Generate Global Unique Batch Slug
 
+
+const generateBatchSlug = (
+  citySlug: string,
+  batchName: string,
+  year: number
+) => {
+  return `${citySlug}-${slugify(batchName, {
+    lower: true,
+    strict: true,
+  })}-${year}`;
+};
+
+
+//  CREATE BATCH
 
 export const createBatch = async (req: Request, res: Response) => {
   try {
@@ -14,64 +28,68 @@ export const createBatch = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Check city exists
     const city = await prisma.city.findUnique({
       where: { id: Number(city_id) },
     });
 
     if (!city) {
-      return res.status(400).json({ error: "City not found" });
+      return res.status(404).json({ error: "City not found" });
     }
 
-    // Generate slug
-    const baseSlug = slugify(batch_name, {
-      lower: true,
-      strict: true,
+    // Prevent duplicate batch name + year in same city
+    const duplicate = await prisma.batch.findFirst({
+      where: {
+        city_id: Number(city_id),
+        year: Number(year),
+        batch_name,
+      },
     });
 
-    // Ensure uniqueness inside same city
+    if (duplicate) {
+      return res.status(400).json({
+        error: "Batch with same name and year already exists in this city",
+      });
+    }
+
+    if (!city.slug) {
+      return res.status(400).json({ error: "City slug is missing" });
+    }
+
+    const baseSlug = generateBatchSlug(city.slug, batch_name, Number(year));
+
     let finalSlug = baseSlug;
     let counter = 1;
 
-    while (true) {
-      const existing = await prisma.batch.findFirst({
-        where: {
-          city_id: Number(city_id),
-          slug: finalSlug,
-        },
-      });
-
-      if (!existing) break;
-
-      finalSlug = `${baseSlug}-${counter}`;
-      counter++;
+    // Ensure global uniqueness
+    while (
+      await prisma.batch.findFirst({
+        where: { slug: finalSlug },
+      })
+    ) {
+      finalSlug = `${baseSlug}-${counter++}`;
     }
 
     const batch = await prisma.batch.create({
       data: {
         batch_name,
-        year,
+        year: Number(year),
         city_id: Number(city_id),
         slug: finalSlug,
       },
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Batch created successfully",
       batch,
     });
-
-  } catch (error: any) {
-    if (error.code === "P2002") {
-      return res.status(400).json({
-        error: "Batch already exists for this city and year",
-      });
-    }
-
-    res.status(500).json({ error: "Failed to create batch" });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to create batch",
+    });
   }
 };
 
+// 📋 GET ALL BATCHES (Optional Filters)
 
 export const getAllBatches = async (req: Request, res: Response) => {
   try {
@@ -81,7 +99,7 @@ export const getAllBatches = async (req: Request, res: Response) => {
 
     if (citySlug) {
       const city = await prisma.city.findUnique({
-        where: { slug: citySlug as string }
+        where: { slug: citySlug as string },
       });
 
       if (!city) {
@@ -97,80 +115,93 @@ export const getAllBatches = async (req: Request, res: Response) => {
 
     const batches = await prisma.batch.findMany({
       where: filters,
-      include: { city: true }
+      include: {
+        city: true,
+        _count: {
+          select: {
+            students: true,
+            classes: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
     });
 
-    res.json(batches);
-
+    return res.json(batches);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch batches" });
+    return res.status(500).json({
+      error: "Failed to fetch batches",
+    });
   }
 };
 
+//  UPDATE BATCH
 
-export const updateBatch = async (
-  req: Request,
-  res: Response
-) => {
+export const updateBatch = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { batch_name, year, city_id } = req.body;
 
     const existingBatch = await prisma.batch.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
     });
 
     if (!existingBatch) {
       return res.status(404).json({ error: "Batch not found" });
     }
 
-    // Determine final values (if not provided, keep old ones)
     const finalBatchName = batch_name ?? existingBatch.batch_name;
     const finalYear = year ?? existingBatch.year;
     const finalCityId = city_id ?? existingBatch.city_id;
 
-    // Check if city exists (if changing city)
-    if (city_id) {
-      const cityExists = await prisma.city.findUnique({
-        where: { id: Number(city_id) }
-      });
+    // Always fetch fresh city (cleaner & safer)
+    const city = await prisma.city.findUnique({
+      where: { id: Number(finalCityId) },
+    });
 
-      if (!cityExists) {
-        return res.status(404).json({ error: "City not found" });
-      }
+    if (!city) {
+      return res.status(404).json({ error: "City not found" });
     }
 
-    // Check unique constraint manually
+    if (!city.slug) {
+      return res.status(400).json({ error: "City slug is missing" });
+    }
+
+    // Prevent duplicate batch inside same city
     const duplicate = await prisma.batch.findFirst({
       where: {
         city_id: finalCityId,
         year: finalYear,
         batch_name: finalBatchName,
-        NOT: { id: existingBatch.id }
-      }
+        NOT: { id: existingBatch.id },
+      },
     });
 
     if (duplicate) {
       return res.status(400).json({
-        error: "Batch with same name and year already exists in this city"
+        error: "Batch with same name and year already exists in this city",
       });
     }
 
-    // Regenerate slug if name OR city changed
     let newSlug = existingBatch.slug;
 
-    if (batch_name || city_id) {
-      const baseSlug = generateSlug(finalBatchName);
+    // Regenerate slug only if something important changed
+    if (batch_name || year || city_id) {
+      const baseSlug = generateBatchSlug(
+        city.slug,
+        finalBatchName,
+        finalYear
+      );
+
       newSlug = baseSlug;
       let counter = 1;
 
       while (
         await prisma.batch.findFirst({
           where: {
-            city_id: finalCityId,
             slug: newSlug,
-            NOT: { id: existingBatch.id }
-          }
+            NOT: { id: existingBatch.id },
+          },
         })
       ) {
         newSlug = `${baseSlug}-${counter++}`;
@@ -183,57 +214,59 @@ export const updateBatch = async (
         batch_name: finalBatchName,
         year: finalYear,
         city_id: finalCityId,
-        slug: newSlug
-      }
+        slug: newSlug,
+      },
     });
 
     return res.json({
       message: "Batch updated successfully",
-      batch: updatedBatch
+      batch: updatedBatch,
     });
 
   } catch (error) {
-    return res.status(500).json({ error: "Failed to update batch" });
+    return res.status(500).json({
+      error: "Failed to update batch",
+    });
   }
 };
 
+//  DELETE BATCH
 
 export const deleteBatch = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
 
     const batch = await prisma.batch.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!batch) {
       return res.status(404).json({ error: "Batch not found" });
     }
 
-    // Check students in this batch
+
     const studentCount = await prisma.student.count({
-      where: { batch_id: batch.id }
+      where: { batch_id: batch.id },
     });
 
     if (studentCount > 0) {
       return res.status(400).json({
-        error: "Cannot delete batch with active students"
+        error: "Cannot delete batch with active students",
       });
     }
 
     await prisma.batch.delete({
-      where: { id: batch.id }
+      where: { id: batch.id },
     });
 
     return res.json({
-      message: "Batch deleted successfully"
+      message: "Batch deleted successfully",
     });
 
   } catch (error) {
     return res.status(500).json({
-      error: "Failed to delete batch"
+      error: "Failed to delete batch",
     });
   }
 };
-
 

@@ -1,204 +1,121 @@
 import { Router } from "express";
 import { verifyToken } from "../middlewares/auth.middleware";
 import { isAdmin, isTeacherOrAbove } from "../middlewares/role.middleware";
+import { resolveBatch } from "../middlewares/batch.middleware";
 
-// ==========================================
-// IMPORT ALL CONTROLLERS (Uncomment as you build)
-// ==========================================
+// 🌍 Global Controllers
+import { getAllCities } from "../controllers/admin/city.controller";
+import { getAllTopics, createTopic } from "../controllers/admin/topic.controller";
+import { createBatch, getAllBatches } from "../controllers/admin/batch.controller";
 
-// City controllers
-import { 
-  getAllCities, 
-  // getCityById 
-} from "../controllers/admin/city.controller";
+// 🏢 Workspace Controllers (inside same files)
+// import { getWorkspaceOverview, getBatchAnalytics, getLeaderboard } from "../controllers/admin/analytics.controller";
 
-// Batch controllers
-import { 
-  // getAllBatches,
-  // getBatchById,
-} from "../controllers/admin/batch.controller";
+import { getTopicsForBatch } from "../controllers/admin/topic.controller";
 
-// Topic controllers
-import { 
-  createTopic, 
-  getAllTopics, 
-  // getTopicById,
-  // updateTopic,
-  // deleteTopic
-} from "../controllers/admin/topic.controller";
+import {
+  createClassInTopic,
+  getClassesByTopic,
+  getClassDetails,
+} from "../controllers/admin/class.controller";
 
-// Question controllers
+import { assignQuestions, getAllQuestions, removeQuestionFromClass } from "../controllers/admin/question.controller";
+
 // import {
-//   createQuestion,
-//   getAllQuestions,
-//   getQuestionById,
-//   getQuestionsByTopic,
-//   updateQuestion,
-//   deleteQuestion
-// } from "../controllers/admin/question.controller";
-
-// Class controllers
-// import {
-//   createClassForBatch,
-//   getClassesByBatch,
-//   getClassById,
-//   updateClass,
-//   deleteClass
-// } from "../controllers/admin/class.controller";
-
-// Assignment controllers
-// import {
-//   assignQuestionsToClass,
-//   getQuestionsForClass,
-//   unassignQuestionFromClass
-// } from "../controllers/admin/assignment.controller";
-
-// Student controllers
-// import {
-//   getStudentsByBatch,
-//   getStudentById,
-//   getStudentProgress
+//   getStudentsForBatch,
+//   getStudentReport,
 // } from "../controllers/admin/student.controller";
-
-// Analytics controllers
-// import {
-//   getBatchAnalytics,
-//   getClassAnalytics
-// } from "../controllers/admin/analytics.controller";
 
 const router = Router();
 
-// All routes require authentication + ADMIN role
-router.use(verifyToken, isAdmin);
+/* ==========================================
+   🔐 GLOBAL PROTECTION
+========================================== */
 
-// ==========================================
-// 🌍 STEP 1: SELECT CITY
-// ==========================================
+router.use(verifyToken);
+router.use(isAdmin);
 
+/* ==========================================
+   🌍 GLOBAL ROUTES (NO BATCH CONTEXT)
+========================================== */
+
+// Cities
 router.get("/cities", getAllCities);
-// Usage: GET /api/admin/cities
 
-// router.get("/cities/:cityId", getCityById);
-// Usage: GET /api/admin/cities/1
+// Batches
+router.post("/batches", createBatch);
+router.get("/batches", getAllBatches);
 
-// ==========================================
-// 🎓 STEP 2: SELECT BATCH IN THAT CITY
-// ==========================================
-
-// router.get("/cities/:cityId/batches", getBatchesByCity);
-// Usage: GET /api/admin/cities/1/batches
-
-// router.get("/cities/:cityId/batches/:batchId", getBatchById);
-// Usage: GET /api/admin/cities/1/batches/1
-
-// ==========================================
-// 👨‍🎓 VIEW STUDENTS IN THIS BATCH
-// ==========================================
-
-// router.get("/cities/:cityId/batches/:batchId/students", getStudentsByBatch);
-// Usage: GET /api/admin/cities/1/batches/1/students
-
-// router.get("/cities/:cityId/batches/:batchId/students/:studentId", getStudentById);
-// Usage: GET /api/admin/cities/1/batches/1/students/1
-
-// router.get("/cities/:cityId/batches/:batchId/students/:studentId/progress", getStudentProgress);
-// Usage: GET /api/admin/cities/1/batches/1/students/1/progress
-
-// ==========================================
-// 🏫 CREATE & MANAGE CLASSES IN THIS BATCH
-// ==========================================
-
-// router.get("/cities/:cityId/batches/:batchId/classes", getClassesByBatch);
-// Usage: GET /api/admin/cities/1/batches/1/classes
-
-// router.post("/cities/:cityId/batches/:batchId/classes", createClassForBatch);
-// Usage: POST /api/admin/cities/1/batches/1/classes
-// Body: { topic_id, class_number, class_date, pdf_url, description, duration_minutes }
-
-// router.get("/cities/:cityId/batches/:batchId/classes/:classId", getClassById);
-// Usage: GET /api/admin/cities/1/batches/1/classes/1
-
-// router.patch("/cities/:cityId/batches/:batchId/classes/:classId", isTeacherOrAbove, updateClass);
-// Usage: PATCH /api/admin/cities/1/batches/1/classes/1
-// Body: { class_number?, pdf_url?, description?, duration_minutes? }
-
-// router.delete("/cities/:cityId/batches/:batchId/classes/:classId", isTeacherOrAbove, deleteClass);
-// Usage: DELETE /api/admin/cities/1/batches/1/classes/1
-
-// ==========================================
-// 🔗 ASSIGN QUESTIONS TO A CLASS
-// ==========================================
-
-// router.get("/cities/:cityId/batches/:batchId/classes/:classId/questions", getQuestionsForClass);
-// Usage: GET /api/admin/cities/1/batches/1/classes/1/questions
-
-// router.post("/cities/:cityId/batches/:batchId/classes/:classId/assign-questions", assignQuestionsToClass);
-// Usage: POST /api/admin/cities/1/batches/1/classes/1/assign-questions
-// Body: { question_ids: [1, 2, 3, 4, 5] }
-
-// router.delete("/cities/:cityId/batches/:batchId/classes/:classId/questions/:questionId", isTeacherOrAbove, unassignQuestionFromClass);
-// Usage: DELETE /api/admin/cities/1/batches/1/classes/1/questions/5
-
-// ==========================================
-// 📊 BATCH ANALYTICS
-// ==========================================
-
-// router.get("/cities/:cityId/batches/:batchId/analytics", getBatchAnalytics);
-// Usage: GET /api/admin/cities/1/batches/1/analytics
-
-// router.get("/cities/:cityId/batches/:batchId/classes/:classId/analytics", getClassAnalytics);
-// Usage: GET /api/admin/cities/1/batches/1/classes/1/analytics
-
-// ==========================================
-// 📚 TOPIC MANAGEMENT (Global)
-// ==========================================
-
+// Global Topics
 router.get("/topics", getAllTopics);
-// Usage: GET /api/admin/topics
-
 router.post("/topics", isTeacherOrAbove, createTopic);
-// Usage: POST /api/admin/topics
-// Body: { topic_name }
 
-// router.get("/topics/:topicId", getTopicById);
-// Usage: GET /api/admin/topics/1
+/* ==========================================
+   🏢 WORKSPACE ROUTES (BATCH CONTEXT)
+========================================== */
 
-// router.patch("/topics/:topicId", isTeacherOrAbove, updateTopic);
-// Usage: PATCH /api/admin/topics/1
-// Body: { topic_name }
+// Everything below requires valid batchSlug
+router.use("/:batchSlug", resolveBatch);
 
-// router.delete("/topics/:topicId", isTeacherOrAbove, deleteTopic);
-// Usage: DELETE /api/admin/topics/1
+/* ---------- Overview ---------- */
 
-// ==========================================
-// ❓ QUESTION MANAGEMENT (Global)
-// ==========================================
+// router.get("/:batchSlug/overview", getWorkspaceOverview);
 
-// router.get("/questions", getAllQuestions);
-// Usage: GET /api/admin/questions?topic_id=1&level=EASY
+/* ---------- Topics ---------- */
 
-// router.post("/questions", createQuestion);
-// Usage: POST /api/admin/questions
-// Body: { question_name, question_link, platform, level, type, topic_id }
+router.get("/:batchSlug/topics", getTopicsForBatch);
 
-// router.get("/questions/topic/:topicId", getQuestionsByTopic);
-// Usage: GET /api/admin/questions/topic/1
+/* ---------- Classes (Topic Driven) ---------- */
 
-// router.get("/questions/:questionId", getQuestionById);
-// Usage: GET /api/admin/questions/1
+// List classes of a topic
+router.get(
+  "/:batchSlug/topics/:topicSlug/classes",
+  getClassesByTopic
+);
 
-// router.patch("/questions/:questionId", isTeacherOrAbove, updateQuestion);
-// Usage: PATCH /api/admin/questions/1
-// Body: { level?, type?, question_name? }
+// Create class under topic
+router.post(
+  "/:batchSlug/topics/:topicSlug/classes",
+  isTeacherOrAbove,
+  createClassInTopic
+);
 
-// router.delete("/questions/:questionId", isTeacherOrAbove, deleteQuestion);
-// Usage: DELETE /api/admin/questions/1
+// Get single class (independent of topic in URL)
+router.get(
+  "/:batchSlug/classes/:classSlug",
+  getClassDetails
+);
 
-// ==========================================
-// 🔍 CONVENIENCE ROUTES
-// ==========================================
+/* ---------- Assign Questions ---------- */
 
-// router.get("/batches", getAllBatches);
-// Usage: GET /api/admin/batches
+
+router.get("/questions", getAllQuestions);
+
+
+router.post(
+  "/:batchSlug/classes/:classSlug/questions",
+  isTeacherOrAbove,
+  assignQuestions
+);
+
+router.delete(
+  "/:batchSlug/classes/:classSlug/questions/:questionId",
+  isTeacherOrAbove,
+  removeQuestionFromClass
+);
+
+
+
+
+
+/* ---------- Students ---------- */
+
+// router.get("/:batchSlug/students", getStudentsForBatch);
+// router.get("/:batchSlug/students/:studentId", getStudentReport);
+
+// /* ---------- Analytics ---------- */
+
+// router.get("/:batchSlug/analytics", getBatchAnalytics);
+// router.get("/:batchSlug/leaderboard", getLeaderboard);
 
 export default router;
