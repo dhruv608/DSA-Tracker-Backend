@@ -21,7 +21,11 @@ import {
   deleteClass,
 } from "../controllers/admin/class.controller";
 
-import { assignQuestions, getAllQuestions, removeQuestionFromClass } from "../controllers/admin/question.controller";
+import {  createQuestion, deleteQuestion, getAllQuestions,  updateQuestion } from "../controllers/admin/question.controller";
+import { assignQuestionsToClass, getAssignedQuestionsOfClass, removeQuestionFromClass } from "../controllers/admin/questionVisibility.controller";
+import { upload } from "../middlewares/upload.middleware";
+import { bulkUploadQuestions } from "../controllers/admin/questionBulk.controller";
+
 
 // import {
 //   getStudentsForBatch,
@@ -103,13 +107,37 @@ router.delete(
 /* ---------- Assign Questions ---------- */
 
 
+// questions gloabal 
+router.post("/questions", isTeacherOrAbove, createQuestion);
 router.get("/questions", getAllQuestions);
+router.patch(
+  "/questions/:id",
+  isTeacherOrAbove,
+  updateQuestion
+);
+router.delete(
+  "/questions/:id",
+  isTeacherOrAbove,
+  deleteQuestion
+);
+router.post(
+  "/questions/bulk-upload",
+  isTeacherOrAbove,
+  upload.single("file"),
+  bulkUploadQuestions
+);
 
+// batch wise class wise question assign
 
 router.post(
   "/:batchSlug/classes/:classSlug/questions",
   isTeacherOrAbove,
-  assignQuestions
+  assignQuestionsToClass
+);
+
+router.get(
+  "/:batchSlug/classes/:classSlug/questions",
+  getAssignedQuestionsOfClass
 );
 
 router.delete(

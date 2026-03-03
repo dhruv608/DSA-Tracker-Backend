@@ -82,7 +82,7 @@ model Topic {
 model Question {
   id            Int                  @id @default(autoincrement())
   question_name String               @db.VarChar(255)
-  question_link String
+  question_link String               @unique
   platform      Platform             @default(LEETCODE)
   level         Level                @default(MEDIUM)
   type          QuestionType         @default(HOMEWORK)
@@ -97,6 +97,8 @@ model Question {
   @@index([platform])
   @@index([level])
 }
+
+
 
 model Class {
   id               Int       @id @default(autoincrement())
@@ -163,6 +165,7 @@ model Bookmark {
 enum Platform {
   LEETCODE
   GFG
+  INTERVIEWBIT
   OTHER
 }
 
