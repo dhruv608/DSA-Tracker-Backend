@@ -94,7 +94,9 @@ export const getStudentReportController = async (
 
         const { username } = req.params;
 
-        const result = await getStudentReportService(username);
+        const usernameStr = Array.isArray(username) ? username[0] : username;
+
+        const result = await getStudentReportService(usernameStr);
 
         return res.status(200).json(result);
 
