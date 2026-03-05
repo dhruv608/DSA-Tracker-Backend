@@ -1,352 +1,296 @@
 # Admin Dashboard API Documentation
 
-## Endpoint
+## Overview
 
-```
-GET /api/admin/dashboard
-```
+The **Admin Dashboard API** provides aggregated analytics about the DSA Tracker platform.
+It summarizes platform activity including student participation, assigned questions, and solved question statistics.
 
-This endpoint provides aggregated analytics data for the Admin Dashboard of the DSA Tracker platform.
-
-It returns information about:
-
-* system overview
-* assigned questions
-* student solved analytics
-* city level statistics
-* batch level statistics
+The dashboard is designed to give administrators a **high-level overview of learning activity across batches**.
 
 ---
 
-# Query Parameters (Filters)
+# Dashboard Filtering Update
 
-All filters are optional.
+Previously the dashboard supported the following filters:
 
-| Parameter | Type   | Description                         |
-| --------- | ------ | ----------------------------------- |
-| city      | string | Filter dashboard data by city slug  |
-| batch     | string | Filter dashboard data by batch slug |
-| year      | number | Filter dashboard data by batch year |
+* `city`
+* `batch`
+* `year`
+
+This approach was replaced with a **simpler and more consistent filter using `batchSlug`**.
+
+Since each batch slug uniquely identifies:
+
+* the **batch**
+* the **city**
+* the **year**
+
+a single filter is sufficient to derive all required context.
+
+---
+
+# Endpoint
+
+```
+GET /admin/dashboard
+```
+
+---
+
+# Query Parameters
+
+| Parameter | Type   | Description                                      |
+| --------- | ------ | ------------------------------------------------ |
+| batchSlug | string | Filters dashboard analytics for a specific batch |
 
 ---
 
 # Example Requests
 
-### Get complete dashboard
+### Get overall dashboard analytics
 
 ```
-GET /api/admin/dashboard
+GET /admin/dashboard
 ```
+
+Returns analytics for the entire platform.
 
 ---
 
-### Filter by city
+### Get dashboard analytics for a specific batch
 
 ```
-GET /api/admin/dashboard?city=noida
+GET /admin/dashboard?batchSlug=bangalore-sot-2024
 ```
+
+This returns analytics only for the specified batch.
 
 ---
 
-### Filter by batch
+# Data Sources
 
-```
-GET /api/admin/dashboard?batch=sot-2024
-```
+The dashboard aggregates data from the following models:
 
----
-
-### Filter by year
-
-```
-GET /api/admin/dashboard?year=2024
-```
+* `City`
+* `Batch`
+* `Student`
+* `Question`
+* `QuestionVisibility`
+* `StudentProgress`
 
 ---
 
-### Multiple filters
+# Dashboard Metrics
 
-```
-GET /api/admin/dashboard?city=noida&year=2024
-```
+The response contains the following sections.
 
 ---
 
-# Response Structure
+# 1. Platform Overview
+
+Provides high-level statistics about the platform.
+
+| Field                  | Description                           |
+| ---------------------- | ------------------------------------- |
+| totalCities            | Total cities registered in the system |
+| totalStudents          | Total students in the filtered scope  |
+| totalAssignedQuestions | Total questions assigned to classes   |
+
+Important rule:
+
+Only questions assigned through **QuestionVisibility** are counted.
+
+Questions that exist in the **global question bank but are not assigned to any class are excluded**.
+
+---
+
+# 2. Assigned Question Analytics
+
+This section analyzes questions assigned to classes.
+
+### Platform Distribution
+
+Shows how many assigned questions belong to each coding platform.
+
+Supported platforms:
+
+* LeetCode
+* GeeksForGeeks
+
+Example:
 
 ```
+platforms:
 {
-  overview: {},
-  assignedQuestions: {},
-  solvedQuestions: {},
-  cityStats: [],
-  batchStats: []
+  leetcode: 120,
+  gfg: 40
 }
 ```
 
 ---
 
-# 1. Overview Section
+### Difficulty Distribution
 
-Provides system level statistics.
+Questions are categorized by difficulty level.
+
+* Easy
+* Medium
+* Hard
 
 Example:
+
+```
+difficulty:
+{
+  easy: 50,
+  medium: 70,
+  hard: 40
+}
+```
+
+---
+
+### Question Type Distribution
+
+Questions are also categorized by assignment type.
+
+* Homework
+* Classwork
+
+Example:
+
+```
+type:
+{
+  homework: 80,
+  classwork: 40
+}
+```
+
+---
+
+# 3. Solved Question Analytics
+
+Tracks solved questions using the **StudentProgress** table.
+
+The analytics show how many questions students have solved on each platform and difficulty level.
+
+Example:
+
+```
+solvedQuestions:
+{
+  leetcode: {
+    easy: 40,
+    medium: 30,
+    hard: 10
+  },
+  gfg: {
+    easy: 15,
+    medium: 10,
+    hard: 5
+  }
+}
+```
+
+---
+
+# Implementation Details
+
+The dashboard is optimized for performance using:
+
+### Parallel Queries
+
+Multiple database queries are executed simultaneously using:
+
+```
+Promise.all()
+```
+
+This reduces response time and improves API performance.
+
+---
+
+### Batch Filtering
+
+When `batchSlug` is provided:
+
+1. The batch is fetched using the slug.
+2. The batch ID is extracted.
+3. All analytics queries are filtered using the batch ID.
+
+Example logic:
+
+```
+BatchSlug → Batch → BatchId → Filter queries
+```
+
+---
+
+# Benefits of Using batchSlug Filtering
+
+Using a single `batchSlug` filter provides several advantages:
+
+* Simplifies API usage
+* Reduces query complexity
+* Prevents inconsistent filter combinations
+* Ensures batch context is always correct
+
+Since batch slug uniquely represents **city + batch + year**, additional filters are unnecessary.
+
+---
+
+# Example Response
 
 ```
 {
   "overview": {
     "totalCities": 4,
     "totalStudents": 120,
-    "totalAssignedQuestions": 540
-  }
-}
-```
+    "totalAssignedQuestions": 180
+  },
 
-Fields:
-
-| Field                  | Description                                   |
-| ---------------------- | --------------------------------------------- |
-| totalCities            | Total number of cities in the system          |
-| totalStudents          | Total students registered                     |
-| totalAssignedQuestions | Total questions assigned by admins to classes |
-
-Note:
-This value counts only **questions assigned to classes**, not the full question bank.
-
----
-
-# 2. Assigned Questions Analytics
-
-Shows analytics for questions assigned by admins.
-
-Example:
-
-```
-{
   "assignedQuestions": {
     "platforms": {
-      "leetcode": 320,
-      "gfg": 220
+      "leetcode": 120,
+      "gfg": 60
     },
     "difficulty": {
-      "easy": 200,
-      "medium": 250,
-      "hard": 90
+      "easy": 60,
+      "medium": 80,
+      "hard": 40
     },
     "type": {
-      "homework": 300,
-      "classwork": 240
+      "homework": 100,
+      "classwork": 80
     }
-  }
-}
-```
+  },
 
-Fields:
-
-### Platforms
-
-| Field    | Description                       |
-| -------- | --------------------------------- |
-| leetcode | Total assigned LeetCode questions |
-| gfg      | Total assigned GFG questions      |
-
----
-
-### Difficulty
-
-| Field  | Description                     |
-| ------ | ------------------------------- |
-| easy   | Total assigned easy questions   |
-| medium | Total assigned medium questions |
-| hard   | Total assigned hard questions   |
-
----
-
-### Type
-
-| Field     | Description                     |
-| --------- | ------------------------------- |
-| homework  | Questions assigned as homework  |
-| classwork | Questions assigned as classwork |
-
----
-
-# 3. Solved Questions Analytics
-
-Shows how many questions students solved.
-
-Example:
-
-```
-{
   "solvedQuestions": {
     "leetcode": {
-      "easy": 50,
-      "medium": 30,
+      "easy": 30,
+      "medium": 20,
       "hard": 10
     },
     "gfg": {
-      "easy": 120,
-      "medium": 80,
-      "hard": 40
+      "easy": 10,
+      "medium": 5,
+      "hard": 2
     }
   }
 }
 ```
 
-Fields:
-
-### LeetCode
-
-| Field  | Description            |
-| ------ | ---------------------- |
-| easy   | Easy problems solved   |
-| medium | Medium problems solved |
-| hard   | Hard problems solved   |
-
 ---
 
-### GFG
+# Future Improvements
 
-| Field  | Description            |
-| ------ | ---------------------- |
-| easy   | Easy problems solved   |
-| medium | Medium problems solved |
-| hard   | Hard problems solved   |
+The dashboard can be further extended with:
 
----
+* Leaderboards
+* Batch performance analytics
+* Coding activity heatmaps
+* AI-based practice recommendations
+* Student ranking system
 
-# 4. City Statistics
-
-Shows analytics grouped by city.
-
-Example:
-
-```
-{
-  "cityStats": [
-    {
-      "city": "Noida",
-      "totalBatches": 3,
-      "totalStudents": 40
-    },
-    {
-      "city": "Bangalore",
-      "totalBatches": 2,
-      "totalStudents": 30
-    }
-  ]
-}
-```
-
-Fields:
-
-| Field         | Description                |
-| ------------- | -------------------------- |
-| city          | City name                  |
-| totalBatches  | Total batches in the city  |
-| totalStudents | Total students in the city |
-
----
-
-# 5. Batch Statistics
-
-Shows analytics grouped by batch.
-
-Example:
-
-```
-{
-  "batchStats": [
-    {
-      "batch": "SOT",
-      "year": 2024,
-      "city": "Noida",
-      "totalStudents": 25
-    }
-  ]
-}
-```
-
-Fields:
-
-| Field         | Description             |
-| ------------- | ----------------------- |
-| batch         | Batch name              |
-| year          | Batch year              |
-| city          | City name               |
-| totalStudents | Total students in batch |
-
----
-
-# Error Responses
-
-### Internal Server Error
-
-```
-Status: 500
-```
-
-```
-{
-  "error": "Dashboard data fetch failed"
-}
-```
-
-Possible reasons:
-
-* database connection error
-* invalid query filters
-* internal server error
-
----
-
-# Notes
-
-1. This dashboard only counts **questions assigned by admins to classes**.
-2. Questions present in the global question bank are **not included unless assigned**.
-3. The API supports multiple filters simultaneously.
-4. All analytics are calculated dynamically from the database.
-
----
-
-# Example Full Response
-
-```
-{
-  "overview": {
-    "totalCities": 4,
-    "totalStudents": 120,
-    "totalAssignedQuestions": 540
-  },
-  "assignedQuestions": {
-    "platforms": {
-      "leetcode": 320,
-      "gfg": 220
-    },
-    "difficulty": {
-      "easy": 200,
-      "medium": 250,
-      "hard": 90
-    },
-    "type": {
-      "homework": 300,
-      "classwork": 240
-    }
-  },
-  "solvedQuestions": {
-    "leetcode": {
-      "easy": 50,
-      "medium": 30,
-      "hard": 10
-    },
-    "gfg": {
-      "easy": 120,
-      "medium": 80,
-      "hard": 40
-    }
-  },
-  "cityStats": [],
-  "batchStats": []
-}
-```
+These features will provide deeper insights into student performance and engagement.

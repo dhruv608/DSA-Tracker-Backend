@@ -1,50 +1,37 @@
 import prisma from "../config/prisma";
 
 export const getDashboardService = async (query: any) => {
-
     try {
 
-        const { city, batch, year } = query;
+        const { batchSlug } = query;
 
-        const batchFilter: any = {};
+        let batchIds: number[] = [];
 
-        if (city) {
-            batchFilter.city = {
-                slug: city
-            };
+        if (batchSlug) {
+            const batch = await prisma.batch.findUnique({
+                where: { slug: batchSlug },
+                select: { id: true }
+            });
+
+            if (!batch) {
+                throw new Error("Batch not found");
+            }
+
+            batchIds = [batch.id];
         }
-
-        if (batch) {
-            batchFilter.slug = batch;
-        }
-
-        if (year) {
-            batchFilter.year = Number(year);
-        }
-
-        const batches = await prisma.batch.findMany({
-            where: batchFilter,
-            select: { id: true }
-        });
-
-        const batchIds = batches.map(b => b.id);
 
         const [
             totalCities,
             totalStudents,
             assignedQuestions,
-            solvedQuestions,
-            cityStats,
-            batchStats
+            solvedQuestions
         ] = await Promise.all([
 
             prisma.city.count(),
 
             prisma.student.count({
                 where: {
-                    batch_id: {
-                        in: batchIds.length ? batchIds : undefined
-                    }
+                    batch_id: batchIds.length ? { in: batchIds } : undefined
                 }
             }),
 
@@ -53,9 +40,7 @@ export const getDashboardService = async (query: any) => {
                     visibility: {
                         some: {
                             class: {
-                                batch_id: {
-                                    in: batchIds.length ? batchIds : undefined
-                                }
+                                batch_id: batchIds.length ? { in: batchIds } : undefined
                             }
                         }
                     }
@@ -71,9 +56,7 @@ export const getDashboardService = async (query: any) => {
             prisma.studentProgress.findMany({
                 where: {
                     student: {
-                        batch_id: {
-                            in: batchIds.length ? batchIds : undefined
-                        }
+                        batch_id: batchIds.length ? { in: batchIds } : undefined
                     }
                 },
                 include: {
@@ -85,24 +68,6 @@ export const getDashboardService = async (query: any) => {
                         }
                     }
                 }
-            }),
-
-            prisma.city.findMany({
-                include: {
-                    batches: {
-                        include: {
-                            students: true
-                        }
-                    }
-                }
-            }),
-
-            prisma.batch.findMany({
-                where: batchFilter,
-                include: {
-                    city: true,
-                    students: true
-                }
             })
 
         ]);
@@ -112,9 +77,7 @@ export const getDashboardService = async (query: any) => {
         // -----------------------------
 
         const platformStats = { leetcode: 0, gfg: 0 };
-
         const difficultyStats = { easy: 0, medium: 0, hard: 0 };
-
         const typeStats = { homework: 0, classwork: 0 };
 
         assignedQuestions.forEach(q => {
@@ -159,36 +122,6 @@ export const getDashboardService = async (query: any) => {
 
         });
 
-        // -----------------------------
-        // CITY ANALYTICS
-        // -----------------------------
-
-        const formattedCityStats = cityStats.map(city => {
-
-            let studentCount = 0;
-
-            city.batches.forEach(batch => {
-                studentCount += batch.students.length;
-            });
-
-            return {
-                city: city.city_name,
-                totalBatches: city.batches.length,
-                totalStudents: studentCount
-            };
-        });
-
-        // -----------------------------
-        // BATCH ANALYTICS
-        // -----------------------------
-
-        const formattedBatchStats = batchStats.map(batch => ({
-            batch: batch.batch_name,
-            year: batch.year,
-            city: batch.city?.city_name,
-            totalStudents: batch.students.length
-        }));
-
         return {
 
             overview: {
@@ -203,11 +136,7 @@ export const getDashboardService = async (query: any) => {
                 type: typeStats
             },
 
-            solvedQuestions: solvedStats,
-
-            cityStats: formattedCityStats,
-
-            batchStats: formattedBatchStats
+            solvedQuestions: solvedStats
 
         };
 
