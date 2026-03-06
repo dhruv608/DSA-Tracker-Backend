@@ -1,298 +1,369 @@
 # DSA Tracker Backend
 
-A comprehensive backend system for tracking DSA (Data Structures and Algorithms) progress across multiple batches and cities.
+<div align="center">
 
-## 🚀 Features
+![DSA Tracker](https://img.shields.io/badge/DSA-Tracker-blue?style=for-the-badge)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)
 
-- **Multi-role Authentication**: Superadmin, Teacher, Intern, and Student roles
-- **City & Batch Management**: Organize students by location and batches
-- **Progress Tracking**: Monitor student progress on DSA questions
-- **Question Management**: Support for LeetCode, GFG, and other platforms
-- **Class Management**: Organize topics and assign questions to classes
-- **Bookmark System**: Students can save important questions
+**A comprehensive backend system for tracking Data Structures and Algorithms progress across multiple batches and cities.**
 
-## 🛠 Tech Stack
+</div>
 
-- **Backend**: Node.js, Express.js, TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT (JSON Web Tokens)
-- **Password Hashing**: bcryptjs
-- **Development**: Nodemon, tsx
+---
 
-## 📋 Database Schema
+## Overview
 
-### Core Models
+DSA Tracker Backend is a robust, scalable platform designed for educational institutions to manage DSA learning programs efficiently. With role-based access control, real-time progress tracking, and comprehensive question management, this system empowers educators to deliver structured DSA education while providing students with detailed insights into their learning journey.
 
-#### **City**
-- `id`, `city_name`, `created_at`
-- Relations: batches, students
+---
 
-#### **Batch**
-- `id`, `batch_name`, `year`, `city_id`, `created_at`
-- Relations: students, classes, questionVisibility
-- Unique constraint: [city_id, year, batch_name]
+## Key Features
 
-#### **Student**
-- `id`, `name`, `email`, `username`, `password_hash`
-- Optional: `google_id`, `enrollment_id`, `leetcode_id`, `gfg_id`
-- Relations: city, batch, progress, bookmarks
-- Profile completion tracking
+### Multi-Role Authentication
+- **Superadmin**: Complete system administration
+- **Teacher**: Class and question management
+- **Intern**: Limited administrative access
+- **Student**: Learning and progress tracking
 
-#### **Admin**
-- `id`, `name`, `email`, `username`, `password_hash`
-- `role`: SUPERADMIN, TEACHER, INTERN (default: INTERN)
-- No city restriction - can access all cities
+### Geographic Organization
+- City-based student management
+- Batch organization by year and groups
+- Hierarchical structure for scalable growth
 
-#### **Topic**
-- `id`, `topic_name`, `created_at`
-- Relations: questions, classes
+### Progress Tracking
+- Real-time question completion tracking
+- Detailed progress analytics
+- Individual and batch performance metrics
 
-#### **Question**
-- `id`, `question_name`, `question_link`
-- `platform`: LEETCODE, GFG, OTHER (default: LEETCODE)
-- `level`: EASY, MEDIUM, HARD (default: MEDIUM)
-- `type`: HOMEWORK, CLASSWORK (default: HOMEWORK)
-- Relations: topic, visibility, progress, bookmarks
+### Question Management
+- Multi-platform support (LeetCode, Codeforces, GFG)
+- Difficulty-based categorization
+- Type-based organization (Homework, Classwork, Contest)
 
-#### **Class**
-- `id`, `topic_id`, `batch_id`, `class_number`
-- Optional: `pdf_url`, `description`, `duration_minutes`, `class_date`
-- Relations: topic, batch, questionVisibility
+### Class Management
+- Topic-based class organization
+- PDF resource integration
+- Scheduled class management
 
-#### **QuestionVisibility**
-- Links questions to classes and batches
-- `class_id`, `question_id`, `batch_id`, `assigned_at`
-- Unique constraint: [class_id, question_id]
+### Student Features
+- Personal bookmark system
+- Comprehensive search and filtering
+- Progress visualization
 
-#### **StudentProgress**
-- Tracks solved questions per student
-- `student_id`, `question_id`, `solved_at`
-- Unique constraint: [student_id, question_id]
+---
 
-#### **Bookmark**
-- Student saved questions
-- `student_id`, `question_id`, `created_at`
-- Unique constraint: [student_id, question_id]
+## Technology Stack
 
-## 🔐 Authentication & Roles
+<div align="center">
 
-### **Role Hierarchy**
-1. **SUPERADMIN**: Full system access
-2. **TEACHER**: Can manage classes, questions, topics
-3. **INTERN**: Limited admin access
-4. **STUDENT**: Can view progress, bookmark questions
+### Backend Framework
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 
-### **Authentication Flow**
-1. **Registration**: Email/username + password
-2. **Login**: JWT token generation with role info
-3. **Token Verification**: Bearer token in Authorization header
-4. **Role-based Access**: Middleware checks user permissions
+### Database & ORM
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white)
 
-### **JWT Token Structure**
-```json
+### Authentication & Security
+![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+![bcrypt](https://img.shields.io/badge/bcrypt-000000?style=flat-square&logo=bcrypt&logoColor=white)
+
+### Development Tools
+![Nodemon](https://img.shields.io/badge/Nodemon-76D04B?style=flat-square&logo=nodemon&logoColor=white)
+![tsx](https://img.shields.io/badge/tsx-3178C6?style=flat-square&logo=typescript&logoColor=white)
+
+</div>
+
+---
+
+## Database Architecture
+
+### Core Entity Relationships
+
+```mermaid
+erDiagram
+    City ||--o{ Batch : contains
+    Batch ||--o{ Student : enrolls
+    Batch ||--o{ Class : hosts
+    Topic ||--o{ Question : categorizes
+    Topic ||--o{ Class : organizes
+    Class ||--o{ QuestionVisibility : assigns
+    Question ||--o{ QuestionVisibility : visible_in
+    Student ||--o{ StudentProgress : tracks
+    Question ||--o{ StudentProgress : completed_by
+    Student ||--o{ Bookmark : saves
+    Question ||--o{ Bookmark : saved_by
+```
+
+### Database Models Overview
+
+| Entity | Primary Purpose | Key Relations |
+|--------|----------------|---------------|
+| **City** | Geographic organization | Batches, Students |
+| **Batch** | Time-based grouping | Students, Classes, Questions |
+| **Student** | User accounts | Progress, Bookmarks, City/Batch |
+| **Admin** | System administration | Role-based permissions |
+| **Topic** | DSA categorization | Questions, Classes |
+| **Question** | Problem repository | Topics, Progress, Visibility |
+| **Class** | Learning sessions | Topics, Batches, Questions |
+| **QuestionVisibility** | Access control | Classes, Questions |
+| **StudentProgress** | Achievement tracking | Students, Questions |
+| **Bookmark** | Personal saves | Students, Questions |
+
+---
+
+## Authentication & Security
+
+### Role-Based Access Control
+
+<div align="center">
+
+| Role | System Access | Data Access | Features |
+|------|---------------|-------------|----------|
+| **Superadmin** | Full | All | Complete system control |
+| **Teacher** | Limited | Assigned | Class & question management |
+| **Intern** | Limited | Restricted | Basic admin functions |
+| **Student** | Restricted | Personal | Learning & progress |
+
+</div>
+
+### Security Implementation
+
+- **JWT Authentication**: Stateless token-based auth with refresh tokens
+- **Password Security**: bcrypt hashing with salt rounds
+- **Role Validation**: Middleware-based permission checking
+- **Input Sanitization**: Comprehensive validation and sanitization
+- **CORS Configuration**: Secure cross-origin resource sharing
+
+---
+
+## API Architecture
+
+### Authentication Endpoints
+```http
+POST /auth/student/register    # Student registration
+POST /auth/student/login       # Student authentication
+POST /auth/student/logout      # Session termination
+POST /auth/admin/login         # Admin authentication
+POST /auth/admin/logout        # Admin session termination
+```
+
+### Student Endpoints
+```http
+GET  /topics                   # Topics with batch progress
+GET  /topics/:slug            # Topic overview with classes
+GET  /topics/:topic/classes/:class  # Class details with questions
+GET  /addedQuestions          # Filterable question list
+PATCH /profile                 # Profile completion
+```
+
+### Admin Endpoints
+```http
+# City & Batch Management
+POST /admin/cities             # Create cities
+GET  /admin/cities             # List all cities
+POST /admin/batches            # Create batches
+GET  /admin/batches/:cityId    # City batches
+
+# Content Management
+POST /admin/topics             # Create topics
+POST /admin/questions          # Add questions
+POST /admin/classes            # Create classes
+```
+
+---
+
+## Advanced Filtering System
+
+### Comprehensive Question Search
+
+The `/addedQuestions` endpoint provides powerful filtering capabilities:
+
+```javascript
+// Filter Examples
 {
-  "id": "user_id",
-  "email": "user_email",
-  "role": "USER_ROLE",
-  "userType": "student|admin"
+  search: "two sum",           // Search in question names and topics
+  topic: "arrays",             // Filter by topic slug
+  level: "EASY",               // Difficulty: EASY | MEDIUM | HARD
+  platform: "LEETCODE",       // Platform: LEETCODE | CODEFORCES | GFG
+  type: "HOMEWORK",            // Type: HOMEWORK | CLASSWORK | CONTEST
+  solved: "false",             // Solved status: true | false
+  page: 1,                     // Pagination
+  limit: 20                    // Results per page
 }
 ```
 
-## 🛣 API Routes
+---
 
-### **Authentication Routes** (`/api/auth`)
+## Development Environment
 
-#### **Student Authentication**
-- `POST /api/auth/student/register`
-  - Body: `name`, `email`, `username`, `password`
-  - Response: User data + JWT token
+### Prerequisites
+- Node.js 16+ 
+- PostgreSQL 12+
+- Git
 
-- `POST /api/auth/student/login`
-  - Body: `email`, `password`
-  - Response: User data + JWT token
+### Quick Setup
 
-#### **Admin Authentication**
-- `POST /api/auth/admin/register`
-  - Body: `name`, `email`, `username`, `password`, `role`
-  - Response: User data + JWT token
-
-- `POST /api/auth/admin/login`
-  - Body: `email`, `password`
-  - Response: User data + JWT token
-
-### **Student Routes** (`/api/students`)
-
-- `PATCH /api/students/profile`
-  - Auth: Student token required
-  - Body: Profile completion data
-  - Updates: city_id, batch_id, leetcode_id, gfg_id, enrollment_id
-
-### **Admin Routes** (`/api/admin`)
-
-#### **City Management**
-- `POST /api/admin/cities`
-  - Auth: Superadmin only
-  - Body: `city_name`
-  - Creates new city
-
-- `GET /api/admin/cities`
-  - Auth: Any authenticated user
-  - Response: List of all cities
-
-#### **Batch Management**
-- `POST /api/admin/batches`
-  - Auth: Superadmin only
-  - Body: `batch_name`, `year`, `city_id`
-  - Creates new batch for a city
-
-- `GET /api/admin/batches/:city_id`
-  - Auth: Any authenticated user
-  - Response: Batches for specific city
-
-## 🔒 Role-Based Access Control
-
-### **Middleware Functions**
-- `verifyToken`: Validates JWT token
-- `isAdmin`: Requires admin userType
-- `isSuperAdmin`: Requires SUPERADMIN role
-- `isTeacherOrAbove`: Requires TEACHER or SUPERADMIN role
-- `isStudent`: Requires student userType
-
-### **Access Matrix**
-
-| Feature | SUPERADMIN | TEACHER | INTERN | STUDENT |
-|---------|------------|---------|---------|---------|
-| Create Cities | ✅ | ❌ | ❌ | ❌ |
-| Create Batches | ✅ | ❌ | ❌ | ❌ |
-| Create Teachers | ✅ | ❌ | ❌ | ❌ |
-| Create Topics | ❌ | ❌ | ❌ | ❌ |
-| Create Questions | ❌ | ❌ | ❌ | ❌ |
-| Create Classes | ❌ | ❌ | ❌ | ❌ |
-| View Cities | ✅ | ✅ | ✅ | ✅ |
-| View Batches | ✅ | ✅ | ✅ | ✅ |
-| Update Profile | ❌ | ❌ | ❌ | ✅ |
-
-## ⚠️ Current Implementation Status
-
-### **✅ Implemented**
-- Authentication system (login/register)
-- City and Batch creation (Superadmin only)
-- Student profile management
-- Database schema with all relations
-- Role-based middleware
-- JWT token system
-
-### **❌ Missing Features**
-- Teacher creation endpoints
-- Topic management
-- Question management
-- Class management
-- Question assignment to classes
-- Progress tracking endpoints
-- Bookmark management
-- Analytics dashboard
-- Google OAuth integration
-
-### **🔧 Known Issues**
-- No initial superadmin seed script
-- Some controller files are empty (analytics, class, question, topic)
-- Teacher role has no specific endpoints yet
-
-## 🚀 Getting Started
-
-### **Prerequisites**
-- Node.js (v16+)
-- PostgreSQL database
-- Environment variables
-
-### **Installation**
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd dsa-tracker-backend
+
+# Install dependencies
 npm install
-```
 
-### **Environment Variables**
-Create `.env` file:
-```
-DATABASE_URL="postgresql://username:password@localhost:5432/dsa_tracker"
-JWT_SECRET="your-super-secret-jwt-key"
-PORT=5000
-```
+# Environment setup
+cp .env.example .env
+# Edit .env with your configuration
 
-### **Database Setup**
-```bash
-# Generate Prisma client
+# Database setup
 npm run prisma:generate
-
-# Run migrations
 npm run prisma:migrate
 
-# (Optional) Open Prisma Studio
-npm run prisma:studio
-```
-
-### **Development**
-```bash
+# Start development server
 npm run dev
 ```
 
-### **Production**
+### Environment Configuration
+
+```env
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/dsa_tracker"
+
+# Authentication
+JWT_SECRET="your-super-secure-jwt-secret"
+REFRESH_TOKEN_SECRET="your-refresh-token-secret"
+
+# Server
+PORT=5000
+NODE_ENV="development"
+
+# Optional: Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+```
+
+---
+
+## System Workflow
+
+<div align="center">
+
+```mermaid
+flowchart TD
+    A[Superadmin Setup] --> B[Create Cities]
+    B --> C[Create Batches]
+    C --> D[Add Teachers]
+    D --> E[Organize Topics]
+    E --> F[Add Questions]
+    F --> G[Create Classes]
+    G --> H[Assign Questions]
+    H --> I[Student Registration]
+    I --> J[Profile Completion]
+    J --> K[Access Questions]
+    K --> L[Track Progress]
+```
+
+</div>
+
+---
+
+## Project Architecture
+
+```
+src/
+├── controllers/          # HTTP request handlers
+│   ├── auth.controller.ts
+│   ├── student.controller.ts
+│   ├── class.controller.ts
+│   └── questionVisibility.controller.ts
+├── services/            # Business logic layer
+│   ├── auth.service.ts
+│   ├── student.service.ts
+│   ├── class.service.ts
+│   └── questionVisibility.service.ts
+├── middleware/          # Authentication & authorization
+│   ├── auth.middleware.ts
+│   ├── role.middleware.ts
+│   └── student.middleware.ts
+├── routes/             # API route definitions
+│   ├── auth.routes.ts
+│   ├── student.routes.ts
+│   └── admin.routes.ts
+├── utils/              # Utility functions
+│   ├── password.util.ts
+│   └── jwt.util.ts
+├── config/             # Configuration files
+│   └── prisma.ts
+└── types/              # TypeScript type definitions
+```
+
+---
+
+## Deployment
+
+### Production Build
+
 ```bash
+# Build for production
 npm run build
+
+# Start production server
 npm start
+
+# With process manager (PM2)
+pm2 start ecosystem.config.js
 ```
 
-## 📝 Initial Setup
+### Docker Support
 
-### **Creating First Superadmin**
-Since there's no seed script, create the first superadmin via:
-
-1. **API Registration**:
-```bash
-curl -X POST http://localhost:5000/api/auth/admin/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Super Admin",
-    "email": "admin@dsa.com",
-    "username": "superadmin",
-    "password": "admin123",
-    "role": "SUPERADMIN"
-  }'
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 5000
+CMD ["npm", "start"]
 ```
 
-2. **Manual Database**:
-```sql
-INSERT INTO "Admin" (name, email, username, password_hash, role)
-VALUES (
-  'Super Admin',
-  'admin@dsa.com',
-  'superadmin',
-  '$2b$10$hashed_password_here',
-  'SUPERADMIN'
-);
-```
+---
 
-## 🔄 Workflow Example
+## Contributing
 
-### **Superadmin Setup Flow**
-1. Login as superadmin
-2. Create cities: `POST /api/admin/cities`
-3. Create batches: `POST /api/admin/batches`
-4. Create teachers: `POST /api/auth/admin/register` (role: "TEACHER")
-5. Teachers can then manage topics, questions, and classes
+We welcome contributions! Please follow these steps:
 
-### **Student Onboarding Flow**
-1. Register: `POST /api/auth/student/register`
-2. Complete profile: `PATCH /api/students/profile`
-3. View assigned questions and track progress
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
 
-## 🤝 Contributing
+### Development Guidelines
 
-1. Fork the repository
-2. Create a feature branch
-3. Implement your changes
-4. Add tests if applicable
-5. Submit a pull request
+- Follow existing code patterns and conventions
+- Write meaningful commit messages
+- Test your changes thoroughly
+- Update documentation as needed
 
-## 📄 License
+---
 
-ISC License
+## License
+
+This project is licensed under the **ISC License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+**Built for the DSA learning community**
+
+[![GitHub stars](https://img.shields.io/github/stars/username/dsa-tracker-backend?style=social)](https://github.com/username/dsa-tracker-backend)
+[![GitHub forks](https://img.shields.io/github/forks/username/dsa-tracker-backend?style=social)](https://github.com/username/dsa-tracker-backend)
+[![GitHub issues](https://img.shields.io/github/issues/username/dsa-tracker-backend)](https://github.com/username/dsa-tracker-backend/issues)
+
+</div>
