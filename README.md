@@ -88,10 +88,10 @@ DSA Tracker Backend is a robust, scalable platform designed for educational inst
 erDiagram
     City ||--o{ Batch : contains
     Batch ||--o{ Student : enrolls
-    Batch ||--o{ Class : hosts
+    Batch ||--o{ ClassSession : hosts
     Topic ||--o{ Question : categorizes
-    Topic ||--o{ Class : organizes
-    Class ||--o{ QuestionVisibility : assigns
+    Topic ||--o{ ClassSession : organizes
+    ClassSession ||--o{ QuestionVisibility : assigns
     Question ||--o{ QuestionVisibility : visible_in
     Student ||--o{ StudentProgress : tracks
     Question ||--o{ StudentProgress : completed_by
@@ -104,13 +104,13 @@ erDiagram
 | Entity | Primary Purpose | Key Relations |
 |--------|----------------|---------------|
 | **City** | Geographic organization | Batches, Students |
-| **Batch** | Time-based grouping | Students, Classes, Questions |
+| **Batch** | Time-based grouping | Students, ClassSessions, Questions |
 | **Student** | User accounts | Progress, Bookmarks, City/Batch |
 | **Admin** | System administration | Role-based permissions |
-| **Topic** | DSA categorization | Questions, Classes |
+| **Topic** | DSA categorization | Questions, ClassSessions |
 | **Question** | Problem repository | Topics, Progress, Visibility |
-| **Class** | Learning sessions | Topics, Batches, Questions |
-| **QuestionVisibility** | Access control | Classes, Questions |
+| **ClassSession** | Learning sessions | Topics, Batches, Questions |
+| **QuestionVisibility** | Access control | ClassSessions, Questions |
 | **StudentProgress** | Achievement tracking | Students, Questions |
 | **Bookmark** | Personal saves | Students, Questions |
 
@@ -464,7 +464,7 @@ This project is licensed under the **ISC License** - see the [LICENSE](LICENSE) 
 
 ---
 
-< align="center">
+<div align="center">
 
 **Built with precision for the DSA learning community**
 
