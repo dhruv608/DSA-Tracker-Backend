@@ -236,21 +236,27 @@ export const getTopicsWithBatchProgressService = async ({
               }
             }
           }
-        }
+        },
+        orderBy: { created_at: 'asc' }
       }
-    },
-    orderBy: { created_at: 'asc' }
+    }
   });
 
-  // Get student's solved questions for these topics
-  const topicIds = topics.map(topic => topic.id);
-  
+  // Get all question IDs assigned to this batch
+  const assignedQuestionIds = new Set<number>();
+  topics.forEach((topic: any) => {
+    topic.classes.forEach((cls: any) => {
+      cls.questionVisibility.forEach((qv: any) => {
+        assignedQuestionIds.add(qv.question.id);
+      });
+    });
+  });
+
+  // Get student's solved questions for this batch only
   const studentProgress = await prisma.studentProgress.findMany({
     where: {
       student_id: studentId,
-      question: {
-        topic_id: { in: topicIds }
-      }
+      question_id: { in: Array.from(assignedQuestionIds) }
     },
     include: {
       question: {
@@ -344,13 +350,19 @@ export const getTopicOverviewWithClassesSummaryService = async ({
     throw new Error("Topic not found");
   }
 
-  // Get student's solved questions for this topic
+  // Get all question IDs assigned to this batch for this topic
+  const assignedQuestionIds = new Set<number>();
+  topic.classes.forEach((cls: any) => {
+    cls.questionVisibility.forEach((qv: any) => {
+      assignedQuestionIds.add(qv.question.id);
+    });
+  });
+
+  // Get student's solved questions for this batch only
   const studentProgress = await prisma.studentProgress.findMany({
     where: {
       student_id: studentId,
-      question: {
-        topic_id: topic.id
-      }
+      question_id: { in: Array.from(assignedQuestionIds) }
     },
     include: {
       question: {
