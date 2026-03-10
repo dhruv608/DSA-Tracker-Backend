@@ -169,7 +169,7 @@ model Leaderboard {
   easy_count   Int      @default(0)
   hard_count   Int      @default(0)
   medium_count Int      @default(0)
-  student      Student  @relation(fields: [student_id], references: [id])
+  student      Student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
 }
 
 enum Platform {
