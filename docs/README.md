@@ -1,262 +1,240 @@
-# DSA Tracker - Developer Documentation
+# API Documentation
 
-## 🎯 Overview
+This directory contains the OpenAPI specification for the DSA Tracker API.
 
-DSA Tracker is a comprehensive learning management system designed to help students track their Data Structures and Algorithms (DSA) progress across multiple coding platforms. The system enables teachers to assign coding questions, monitor student progress, and maintain competitive leaderboards.
+## Files
 
-## 🏗️ System Architecture
+- `openapi.yaml` - Complete API specification in OpenAPI 3.0 format
+- `README.md` - This file with usage instructions
 
-- **Backend**: Node.js + Express + TypeScript + Prisma ORM
-- **Database**: PostgreSQL
-- **Authentication**: JWT-based with role-based access control
-- **APIs**: RESTful APIs with comprehensive filtering and pagination
+## Accessing Documentation
 
-## 👥 User Roles
-
-- **SuperAdmin**: System administration, city/batch management
-- **Teacher/Admin**: Question assignment, progress monitoring
-- **Student**: Problem solving, progress tracking, leaderboard viewing
-
-## 📚 Documentation Structure
-
-### 🏛️ [Architecture](./architecture/)
-- [System Overview](./architecture/system-overview.md) - High-level system design
-- [Backend Architecture](./architecture/backend-architecture.md) - Technical implementation details
-- [Request Flow](./architecture/request-flow.md) - API request lifecycle
-
-### 👤 [Roles & Permissions](./roles/)
-- [Roles Overview](./roles/roles-overview.md) - Role hierarchy and permissions
-- [SuperAdmin](./roles/superadmin.md) - System administrator guide
-- [Teacher/Admin](./roles/teacher-admin.md) - Educator guide
-- [Student](./roles/student.md) - Student user guide
-
-### 🗄️ [Database](./database/)
-- [Models](./database/models.md) - Complete database schema
-- [Relationships](./database/relationships.md) - Entity relationships
-
-### 🔌 [API Documentation](./api/)
-- [API Overview](./api/api-overview.md) - API design principles
-- [API Index](./api/api-index.md) - Complete API reference table
-- [Authentication](./api/auth.md) - Auth endpoints
-- [Topics](./api/topics.md) - Topic management APIs
-- [Questions](./api/questions.md) - Question APIs
-- [Students](./api/students.md) - Student APIs
-- [Leaderboard](./api/leaderboard.md) - Leaderboard APIs
-
-### 🎨 [Frontend Integration](./frontend/)
-- [Frontend Overview](./frontend/frontend-overview.md) - Integration guide
-- [API Integration](./frontend/api-integration.md) - Frontend API usage
-- [UI Pages](./frontend/ui-pages.md) - Page documentation
-- [State Management](./frontend/state-management.md) - Data flow
-
-### 🔄 [Workflows](./workflows/)
-- [Teacher Workflow](./workflows/teacher-workflow.md) - Teacher operations
-- [Student Workflow](./workflows/student-workflow.md) - Student operations
-- [Progress Tracking](./workflows/progress-tracking.md) - Progress system
-
-### ⚙️ [System](./system/)
-- [Cron Jobs](./system/cron-jobs.md) - Background processes
-- [External Integrations](./system/external-integrations.md) - Third-party services
-- [Error Handling](./system/error-handling.md) - Error management
-
-### 🚀 [Future](./future/)
-- [Performance](./future/performance.md) - Optimization strategies
-- [Scaling](./future/scaling.md) - Scaling considerations
-- [Future Improvements](./future/future-improvements.md) - Roadmap
-
-## 🚀 Quick Start for Developers
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL
-- Git
-
-### Setup Steps
-
-1. **Clone Repository**
-   ```bash
-   git clone <repository-url>
-   cd dsa-tracker-backend
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   cp .env.example .env
-   # Configure database and JWT secrets
-   ```
-
-4. **Database Setup**
-   ```bash
-   npx prisma migrate dev
-   npx prisma generate
-   ```
-
-5. **Start Development Server**
-   ```bash
-   npm run dev
-   ```
-
-### Key Development Commands
-
-```bash
-# Database operations
-npx prisma studio          # Database GUI
-npx prisma migrate dev      # Run migrations
-npx prisma generate         # Generate client
-
-# Development
-npm run dev                 # Start dev server
-npm run build              # Build for production
-npm run test               # Run tests
+When the server is running, visit:
+```
+http://localhost:5000/api-docs
 ```
 
-## 🏛️ Project Structure
+This will open Swagger UI where you can:
+- View all API endpoints
+- Test API requests directly
+- View request/response schemas
+- Download the OpenAPI specification
 
-```
-src/
-├── app.ts              # Express app configuration
-├── server.ts           # Server startup
-├── config/             # Configuration files
-├── controllers/        # API route handlers
-├── middlewares/        # Request processing middleware
-├── routes/            # API route definitions
-├── services/          # Business logic layer
-├── utils/             # Utility functions
-├── types/             # TypeScript types
-└── jobs/              # Background jobs
-```
+## Adding New API Endpoints
 
-## 🔐 Authentication Flow
+When you add a new API endpoint to the codebase, you should also document it in `openapi.yaml`. Follow these steps:
 
-1. User login with email/username + password
-2. Server validates credentials
-3. JWT access token + refresh token generated
-4. Tokens stored in database for session management
-5. Subsequent requests use Bearer token
-6. Role-based middleware enforces permissions
+### 1. Add the Path
 
-## 📊 Core Features
+In the `paths` section of `openapi.yaml`, add your new endpoint:
 
-### 🎯 Student Features
-- View assigned questions by topic and class
-- Track progress across LeetCode, GFG, InterviewBit
-- View personal and batch leaderboards
-- Filter questions by difficulty, platform, type
-- Real-time progress synchronization
-
-### 👨‍🏫 Teacher Features
-- Create and manage topics
-- Assign questions to classes
-- Monitor student progress
-- View batch-specific statistics
-- Manage class schedules
-
-### 🏛️ Admin Features
-- City and batch management
-- Admin user management
-- System-wide statistics
-- User role management
-
-## 🔄 Request Flow
-
-```
-Frontend → API Route → Middleware → Controller → Service → Database → Response
+```yaml
+paths:
+  # Existing paths...
+  
+  /api/your/new-endpoint:
+    post:
+      tags:
+        - YourTag
+      summary: Brief description
+      description: Detailed description of what this endpoint does
+      security:
+        - bearerAuth: []
 ```
 
-1. **API Route**: Defines endpoint and HTTP method
-2. **Middleware**: Authentication, validation, role checking
-3. **Controller**: Request/response handling
-4. **Service**: Business logic implementation
-5. **Database**: Data persistence via Prisma
+### 2. Add Parameters (if any)
 
-## 📱 API Design Principles
-
-- **RESTful**: Clean resource-based endpoints
-- **Consistent**: Standardized response formats
-- **Secure**: Role-based access control
-- **Scalable**: Pagination and filtering support
-- **Documented**: Comprehensive API documentation
-
-## 🔧 Development Guidelines
-
-### Code Organization
-- Controllers handle HTTP concerns only
-- Services contain business logic
-- Middleware handles cross-cutting concerns
-- Types ensure type safety
-
-### Database Design
-- Use Prisma migrations for schema changes
-- Foreign key constraints ensure data integrity
-- Indexes optimize query performance
-- Soft deletes for data preservation
-
-### Error Handling
-- Consistent error response format
-- Proper HTTP status codes
-- Detailed error messages for debugging
-- Client-friendly error descriptions
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test file
-npm test auth.test.js
-
-# Run with coverage
-npm run test:coverage
+```yaml
+parameters:
+  - name: parameterName
+    in: path          # or query, header
+    required: true
+    schema:
+      type: string
+    example: "example-value"
 ```
 
-## 📈 Monitoring & Logging
+### 3. Add Request Body (if applicable)
 
-- Request/response logging
-- Error tracking and reporting
-- Performance metrics
-- Database query optimization
-
-## 🚀 Deployment
-
-### Environment Variables
-```env
-DATABASE_URL=postgresql://...
-JWT_ACCESS_SECRET=...
-JWT_REFRESH_SECRET=...
-NODE_ENV=production
-PORT=5000
+```yaml
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - requiredField
+        properties:
+          requiredField:
+            type: string
+            example: "example-value"
+          optionalField:
+            type: number
+            example: 123
 ```
 
-### Production Considerations
-- Use environment-specific configurations
-- Enable database connection pooling
-- Implement proper logging
-- Set up monitoring and alerting
+### 4. Add Response Schema
 
-## 🤝 Contributing
+```yaml
+responses:
+  '200':
+    description: Success response
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Operation successful"
+            data:
+              type: object
+              # Your response schema here
+```
 
-1. Fork the repository
-2. Create feature branch
-3. Make changes with proper testing
-4. Update documentation
-5. Submit pull request
+### 5. Add Error Responses
 
-## 📞 Support
+Use the reusable response templates:
 
-For technical questions or issues:
-1. Check existing documentation
-2. Review API specifications
-3. Contact development team
-4. Create GitHub issue
+```yaml
+responses:
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '500':
+    $ref: '#/components/responses/InternalServerError'
+```
 
----
+### 6. Add New Schemas (if needed)
 
-**Last Updated**: March 2025  
-**Version**: 2.0.0  
-**Maintainers**: DSA Tracker Development Team
+If your endpoint uses new data structures, add them to the `components/schemas` section:
+
+```yaml
+components:
+  schemas:
+    YourNewSchema:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Example Name"
+```
+
+## Documentation Best Practices
+
+### 1. Use Descriptive Names
+- Use clear, descriptive operation IDs and summaries
+- Group related endpoints using tags
+
+### 2. Provide Examples
+- Include example values for all parameters and responses
+- Use realistic data in examples
+
+### 3. Document All Fields
+- Explain what each field represents
+- Specify data types and formats
+- Mark required fields clearly
+
+### 4. Include Error Handling
+- Document all possible error responses
+- Use the standard error response templates
+
+### 5. Security
+- Always specify the security requirements for protected endpoints
+- Use `bearerAuth` for JWT authentication
+
+## Template for New Endpoints
+
+Copy and modify this template for new endpoints:
+
+```yaml
+/api/your/endpoint:
+  method:
+    tags:
+      - YourTag
+    summary: Brief one-line description
+    description: 
+      Detailed description of the endpoint.
+      Include what it does, who can use it, and any important notes.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: pathParam
+        in: path
+        required: true
+        schema:
+          type: string
+        example: "example"
+      - name: queryParam
+        in: query
+        schema:
+          type: string
+        description: Optional parameter description
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/YourRequestSchema'
+    responses:
+      '200':
+        description: Success
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/YourResponseSchema'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+```
+
+## Validation
+
+After updating the OpenAPI specification:
+
+1. Restart the server
+2. Visit `http://localhost:5000/api-docs`
+3. Verify your new endpoint appears correctly
+4. Test the endpoint using Swagger UI
+5. Check that all schemas and examples are properly displayed
+
+## Common Issues
+
+### YAML Syntax
+- Use spaces, not tabs for indentation
+- Ensure proper nesting of elements
+- Validate YAML syntax if you encounter errors
+
+### Schema References
+- Use `$ref` to reference reusable components
+- Ensure all referenced schemas exist
+- Check for circular references
+
+### Security
+- Don't forget to add security requirements for protected endpoints
+- Use the standard `bearerAuth` scheme for JWT authentication
+
+## Tools
+
+- [Swagger Editor](https://editor.swagger.io/) - Online YAML editor with validation
+- [OpenAPI Generator](https://github.com/OpenAPITools/openapi-generator) - Generate client code from specs
+- [Postman](https://www.postman.com/) - Import OpenAPI specs for testing
+
+## Support
+
+If you need help with API documentation:
+1. Check existing endpoints in `openapi.yaml` for examples
+2. Refer to the [OpenAPI 3.0 specification](https://swagger.io/specification/)
+3. Ask in the team chat for assistance
