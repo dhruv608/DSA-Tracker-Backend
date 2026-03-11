@@ -192,13 +192,13 @@ export const getAdminLeaderboard = async (req: Request, res: Response) => {
             year: year || new Date().getFullYear()
         };
         
-        // Step 4 — Prepare pagination
+        // Step 4 - Prepare pagination
         const pagination = {
             page: Number(page),
             limit: Number(limit)
         };
         
-        // Step 5 — Fetch leaderboard using shared service
+        // Step 5 - Fetch leaderboard using shared service
         const result = await getLeaderboardWithPagination(filters, pagination, search);
         
         return res.status(200).json({
