@@ -93,13 +93,52 @@ router.get("/dashboard", getDashboardController);
 router.post("/stats", getAdminStats);
 
 // Leaderboard
+// router.get("/leaderboard", getAdminLeaderboard);
 router.post("/leaderboard", verifyToken, isAdmin, getAdminLeaderboard); // Single admin leaderboard with pagination and search
+// router.post("/leaderboard/recalculate", recalculateLeaderboard);
 
+// 🚨 Emergency: Restore leaderboard data after migration
+// router.post("/leaderboard/restore", async (req, res) => {
+//   try {
+//     console.log("🔄 Restoring leaderboard data...");
+    
+//     // Get all students
+//     const students = await prisma.student.findMany({ select: { id: true } });
+    
+//     // Create leaderboard entries for each student
+//     let created = 0;
+//     for (const student of students) {
+//       const existing = await (prisma as any).leaderboard.findUnique({
+//         where: { student_id: student.id }
+//       });
+      
+//       if (!existing) {
+//         await (prisma as any).leaderboard.create({
+//           data: {
+//             student_id: student.id,
+//             max_streak: 0,
+//             easy_count: 0,
+//             medium_count: 0,
+//             hard_count: 0,
+//             total_solved: 0
+//           }
+//         });
+//         created++;
+//       }
+//     }
+    
+//     res.json({ 
+//       success: true, 
+//       message: `Restored ${created} leaderboard entries`,
+//       totalStudents: students.length 
+//     });
+//   } catch (error) {
+//     console.error("Restore failed:", error);
+//     res.status(500).json({ success: false, error: (error as any).message });
+//   }
+// });
 
-
-
-
-router.get("/assignedquestions", getAssignedQuestionsController);
+router.get("/questions", getAssignedQuestionsController);
 
 router.patch("/students/:id", isTeacherOrAbove, isAdmin, updateStudentDetails);
 
@@ -111,8 +150,8 @@ router.get("/students/:username", getStudentReportController);
 router.post("/students", isTeacherOrAbove, createStudentController);
 
 router.post("/students/progress", isTeacherOrAbove, isAdmin, addStudentProgressController);
-// router.get("/test/leetcode/:username", testLeetcode);
-// router.get("/test/gfg/:username", testGfg);
+router.get("/test/leetcode/:username", testLeetcode);
+router.get("/test/gfg/:username", testGfg);
 router.post("/students/sync/:id", manualSync);
 
 router.post(
@@ -161,7 +200,7 @@ router.delete(
 
 // Question assignment routes (topic context required)
 router.post(
-  "/:batchSlug/topics/:topicSlug/classes/:classSlug/questions",
+  "j",
   isTeacherOrAbove,
   assignQuestionsToClass
 );

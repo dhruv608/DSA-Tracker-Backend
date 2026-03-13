@@ -10,7 +10,19 @@ import { Prisma } from "@prisma/client";
 export const getAllStudentsService = async (query: any) => {
     try {
 
-        const { search, city, batchSlug, sortBy = "created_at", order = "desc" } = query;
+        const { 
+            search, 
+            city, 
+            batchSlug, 
+            sortBy = "created_at", 
+            order = "desc",
+            page = 1,
+            limit = 10,
+            minGlobalRank,
+            maxGlobalRank,
+            minCityRank,
+            maxCityRank
+        } = query;
 
         const where: any = {};
 
@@ -52,49 +64,118 @@ export const getAllStudentsService = async (query: any) => {
             };
         }
 
-        const students = await prisma.student.findMany({
-            where,
-            include: {
-                city: true,
-                batch: true,
-                _count: {
-                    select: {
-                        progress: true
+        // pagination
+        const skip = (Number(page) - 1) * Number(limit);
+        const take = Number(limit);
+
+        const [students, totalCount] = await Promise.all([
+            // Get students with pagination
+            prisma.student.findMany({
+                where,
+                include: {
+                    city: true,
+                    batch: true,
+                    _count: {
+                        select: {
+                            progress: true
+                        }
                     }
-                }
-            },
-            orderBy
+                },
+                orderBy,
+                skip,
+                take
+            }),
+            // Get total count for pagination
+            prisma.student.count({ where })
+        ]);
+
+        // Get leaderboard data separately with rank filters
+        let leaderboardQuery = `
+            SELECT 
+                student_id,
+                alltime_global_rank as global_rank,
+                alltime_city_rank as city_rank
+            FROM "Leaderboard"
+            WHERE student_id = ANY(${students.map(s => s.id)})
+        `;
+
+        // Add rank filters if provided
+        const rankFilters = [];
+        if (minGlobalRank) rankFilters.push(`alltime_global_rank >= ${Number(minGlobalRank)}`);
+        if (maxGlobalRank) rankFilters.push(`alltime_global_rank <= ${Number(maxGlobalRank)}`);
+        if (minCityRank) rankFilters.push(`alltime_city_rank >= ${Number(minCityRank)}`);
+        if (maxCityRank) rankFilters.push(`alltime_city_rank <= ${Number(maxCityRank)}`);
+        
+        if (rankFilters.length > 0) {
+            leaderboardQuery += ` AND ${rankFilters.join(' AND ')}`;
+        }
+
+        const leaderboardData = await prisma.$queryRawUnsafe(leaderboardQuery);
+
+        // Create a map for quick lookup
+        const leaderboardMap = new Map(
+            (leaderboardData as any[]).map(entry => [entry.student_id, entry])
+        );
+
+        // Filter students based on rank availability if rank filters are applied
+        let filteredStudents = students;
+        if (rankFilters.length > 0) {
+            filteredStudents = students.filter(student => 
+                leaderboardMap.has(student.id)
+            );
+        }
+
+        const formatted = filteredStudents.map((student) => {
+            const leaderboard = leaderboardMap.get(student.id);
+            return {
+                id: student.id,
+                name: student.name,
+                email: student.email,
+                username: student.username,
+                enrollment_id: student.enrollment_id,
+
+                city: student.city?.city_name || null,
+                batch: student.batch?.batch_name || null,
+
+                leetcode_id: student.leetcode_id,
+                gfg_id: student.gfg_id,
+
+                github: student.github,
+                linkedin: student.linkedin,
+
+                gfg_total_solved: student.gfg_total_solved,
+                lc_total_solved: student.lc_total_solved,
+
+                totalSolved: student._count.progress,
+
+                // Leaderboard ranks
+                global_rank: leaderboard?.global_rank || null,
+                city_rank: leaderboard?.city_rank || null,
+
+                provider: student.provider,
+                last_synced_at: student.last_synced_at,
+
+                created_at: student.created_at,
+                updated_at: student.updated_at
+            };
         });
 
-        const formatted = students.map((student) => ({
-            id: student.id,
-            name: student.name,
-            email: student.email,
-            username: student.username,
-            enrollment_id: student.enrollment_id,
+        // Calculate pagination info
+        const totalPages = Math.ceil(totalCount / take);
+        const hasNextPage = Number(page) < totalPages;
+        const hasPreviousPage = Number(page) > 1;
 
-            city: student.city?.city_name || null,
-            batch: student.batch?.batch_name || null,
-
-            leetcode_id: student.leetcode_id,
-            gfg_id: student.gfg_id,
-
-            github: student.github,
-            linkedin: student.linkedin,
-
-            gfg_total_solved: student.gfg_total_solved,
-            lc_total_solved: student.lc_total_solved,
-
-            totalSolved: student._count.progress,
-
-            provider: student.provider,
-            last_synced_at: student.last_synced_at,
-
-            created_at: student.created_at,
-            updated_at: student.updated_at
-        }));
-
-        return formatted;
+        return {
+            students: formatted,
+            pagination: {
+                page: Number(page),
+                limit: take,
+                total: totalCount,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage
+            }
+        };
 
     } catch (error) {
         throw new Error("Failed to fetch students");

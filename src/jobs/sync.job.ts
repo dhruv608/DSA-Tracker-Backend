@@ -8,6 +8,7 @@ export function startSyncJob() {
   
   // 🚀 Combined sync job: Student Progress FIRST, then Leaderboard
   cron.schedule("0 */4 * * *", async () => {
+  // cron.schedule("* * * * *", async () => {
 
     console.log("🔄 Starting combined sync cycle...");
     

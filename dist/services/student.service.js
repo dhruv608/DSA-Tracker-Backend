@@ -52,6 +52,7 @@ const getAllStudentsService = async (query) => {
             include: {
                 city: true,
                 batch: true,
+                leaderboards: true,
                 _count: {
                     select: {
                         progress: true
@@ -75,6 +76,9 @@ const getAllStudentsService = async (query) => {
             gfg_total_solved: student.gfg_total_solved,
             lc_total_solved: student.lc_total_solved,
             totalSolved: student._count.progress,
+            // Leaderboard ranks
+            global_rank: student.leaderboards?.global_rank || null,
+            city_rank: student.leaderboards?.city_rank || null,
             provider: student.provider,
             last_synced_at: student.last_synced_at,
             created_at: student.created_at,

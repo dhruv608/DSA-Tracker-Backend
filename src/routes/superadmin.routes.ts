@@ -42,15 +42,13 @@ router.delete("/batches/:id", deleteBatch);
 
 
 
-// ===== ADMIN =====
-
-
-
 // ===== ADMIN MANAGEMENT =====
 router.post("/admins", createSuperAdminController);                    // Create admin (SuperAdmin - auto fetch city_id from batch)
 router.get("/admins", getAllAdminsController);             // Get all admins with filters
 router.patch("/admins/:id", updateSuperAdminController);           // Update admin (SuperAdmin - only role & batch_id allowed)
 router.delete("/admins/:id", deleteAdminController);         // Delete admin
+
+
 
 // ===== SYSTEM STATS =====
 router.get("/stats", async (req, res) => {

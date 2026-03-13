@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/dhruv608/DSA-Tracker-Backend#readme",
   "dependencies": {
-    "@prisma/client": "6.8.0",
+    "@prisma/client": "^6.8.0",
     "@prisma/extension-accelerate": "^3.0.1",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
