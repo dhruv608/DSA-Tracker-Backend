@@ -6,14 +6,15 @@ import { getTopicsWithBatchProgress, getTopicOverviewWithClassesSummary } from "
 import { getClassDetailsWithFullQuestions } from "../controllers/class.controller";
 import { getAllQuestionsWithFilters } from "../controllers/questionVisibility.controller";
 import { getStudentLeaderboard } from "../controllers/leaderboard.controller";
-import { getStudentProfile } from "../controllers/studentProfile.controller";
+import { getStudentProfile, getPublicStudentProfile } from "../controllers/studentProfile.controller";
 
 const router = Router();
 
+// Public route - no authentication required
+router.get("/profile/:username", getPublicStudentProfile); // Public student profile by username
+
 // All routes require authentication + STUDENT role + student info extraction
 router.use(verifyToken, isStudent, extractStudentInfo);
-
-
 
 // ===== TOPICS ROUTES =====
 router.get("/topics", getTopicsWithBatchProgress); // All topics with batch-specific classes, total questions per batch, and topic-specific solved question count (frontend will calculate progress percentage)
@@ -28,8 +29,6 @@ router.get("/addedQuestions", getAllQuestionsWithFilters); // All questions with
 // ===== LEADERBOARD ROUTES =====
 router.post("/leaderboard", getStudentLeaderboard); // Single student leaderboard with top 10 and personal rank
 
-// ===== PROFILE ROUTES =====
-// router.get("/profile/lite", getStudentProfileLite); // Fast loading - essential data only
 router.get("/profile", getStudentProfile); // Complete student profile with all sections
 
 

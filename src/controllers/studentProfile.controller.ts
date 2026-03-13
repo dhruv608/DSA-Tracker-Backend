@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { StudentRequest } from "../middlewares/student.middleware";
-import { getStudentProfileService,  } from "../services/studentProfile.service";
+import { getStudentProfileService, getPublicStudentProfileService } from "../services/studentProfile.service";
 
 export const getStudentProfile = async (req: StudentRequest, res: Response) => {
   try {
@@ -16,6 +16,24 @@ export const getStudentProfile = async (req: StudentRequest, res: Response) => {
     console.error("Profile error:", error);
     res.status(500).json({ 
       error: error instanceof Error ? error.message : "Failed to get student profile" 
+    });
+  }
+};
+
+export const getPublicStudentProfile = async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+    
+    if (!username || Array.isArray(username)) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    const profile = await getPublicStudentProfileService(username);
+    res.json(profile);
+  } catch (error) {
+    console.error("Public profile error:", error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Failed to get public student profile" 
     });
   }
 };
