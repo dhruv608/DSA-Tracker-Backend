@@ -7,7 +7,7 @@ exports.bulkStudentUploadService = void 0;
 const csv_parser_1 = __importDefault(require("csv-parser"));
 const stream_1 = require("stream");
 const prisma_1 = __importDefault(require("../config/prisma"));
-const bulkStudentUploadService = async (fileBuffer, batch_id) => {
+const bulkStudentUploadService = async (fileBuffer, { batch_id }) => {
     const rows = [];
     const stream = stream_1.Readable.from(fileBuffer);
     return new Promise((resolve, reject) => {

@@ -25,7 +25,6 @@ router.get("/batches", batch_controller_1.getAllBatches);
 router.post("/batches", batch_controller_1.createBatch);
 router.patch("/batches/:id", batch_controller_1.updateBatch);
 router.delete("/batches/:id", batch_controller_1.deleteBatch);
-// ===== ADMIN =====
 // ===== ADMIN MANAGEMENT =====
 router.post("/admins", superadmin_controller_1.createSuperAdminController); // Create admin (SuperAdmin - auto fetch city_id from batch)
 router.get("/admins", admin_controller_1.getAllAdminsController); // Get all admins with filters

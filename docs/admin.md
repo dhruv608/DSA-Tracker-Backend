@@ -423,7 +423,304 @@ DELETE /api/admin/batch/topic/linked-lists
 
 ---
 
-## 📚 Questions Library
+## � Student Management
+
+### **Get All Students**
+
+**Endpoint:** `GET /api/admin/students`
+
+**Behavior**
+Returns all students with comprehensive filtering, pagination, and ranking capabilities. Includes global and city ranks from the leaderboard system.
+
+**Request:**
+```http
+GET /api/admin/students?search=john&city=Bangalore&page=1&limit=10&sortBy=totalSolved&order=desc&minGlobalRank=1&maxGlobalRank=50
+```
+
+**Query Parameters:**
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `search` | string | Search by name, email, username, or enrollment ID | `"john"` |
+| `city` | string | Filter by city name | `"Bangalore"` |
+| `batchSlug` | string | Filter by batch slug | `"bangalore-so-batch-2025"` |
+| `sortBy` | string | Sort field | `"created_at"`, `"totalSolved"`, `"name"` |
+| `order` | string | Sort order | `"asc"`, `"desc"` |
+| `page` | number | Pagination page (default: 1) | `1` |
+| `limit` | number | Results per page (default: 10) | `10` |
+| `minGlobalRank` | number | Minimum global rank filter | `1` |
+| `maxGlobalRank` | number | Maximum global rank filter | `50` |
+| `minCityRank` | number | Minimum city rank filter | `1` |
+| `maxCityRank` | number | Maximum city rank filter | `20` |
+
+**Response:**
+```json
+{
+  "students": [
+    {
+      "id": 123,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "username": "johndoe",
+      "enrollment_id": "EN2025001",
+      "city": "Bangalore",
+      "batch": "SO-Batch-2025",
+      "leetcode_id": "johndoe_lc",
+      "gfg_id": "johndoe_gfg",
+      "github": "johndoe",
+      "linkedin": "johndoe-dev",
+      "gfg_total_solved": 145,
+      "lc_total_solved": 89,
+      "totalSolved": 234,
+      "global_rank": 15,
+      "city_rank": 3,
+      "provider": "google",
+      "last_synced_at": "2025-01-15T10:30:00Z",
+      "created_at": "2025-01-01T08:00:00Z",
+      "updated_at": "2025-01-15T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 156,
+    "totalPages": 16,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
+}
+```
+
+**UI Usage:**
+- Use `students` array to display student list/table
+- Display `global_rank` and `city_rank` in rank columns
+- Use `totalSolved` for progress/solved count
+- Use `pagination` object for page navigation controls
+- Implement search using `search` parameter
+- Add rank range filters using `minGlobalRank`, `maxGlobalRank`, `minCityRank`, `maxCityRank`
+- Sort by different fields using `sortBy` and `order`
+
+**Rank Filtering Examples:**
+- Top 100 students: `?maxGlobalRank=100`
+- Students ranked 1-50 globally: `?minGlobalRank=1&maxGlobalRank=50`
+- Top 10 in Bangalore: `?city=Bangalore&maxCityRank=10`
+- Best performers in batch: `?batchSlug=bangalore-so-batch-2025&minGlobalRank=1&maxGlobalRank=20`
+
+---
+
+### **Get Student Report**
+
+**Endpoint:** `GET /api/admin/students/{username}`
+
+**Behavior**
+Returns detailed student report including progress statistics, recent activity, and topic-wise performance.
+
+**Request:**
+```http
+GET /api/admin/students/johndoe
+```
+
+**Response:**
+```json
+{
+  "student": {
+    "id": 123,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "city": "Bangalore",
+    "batch": {
+      "batch_name": "SO-Batch-2025",
+      "year": 2025
+    },
+    "created_at": "2025-01-01T08:00:00Z"
+  },
+  "stats": {
+    "totalSolved": 234,
+    "platforms": {
+      "leetcode": { "total": 89, "easy": 45, "medium": 32, "hard": 12 },
+      "gfg": { "total": 145, "easy": 78, "medium": 52, "hard": 15 }
+    },
+    "difficulty": { "easy": 123, "medium": 84, "hard": 27 },
+    "type": { "homework": 180, "classwork": 54 },
+    "topicStats": [
+      { "topic": "Arrays", "totalQuestions": 25, "solvedByStudent": 22 },
+      { "topic": "Linked Lists", "totalQuestions": 20, "solvedByStudent": 18 }
+    ]
+  },
+  "recentActivity": [
+    {
+      "question": {
+        "question_name": "Two Sum",
+        "level": "EASY",
+        "platform": "LEETCODE",
+        "topic": { "topic_name": "Arrays" }
+      },
+      "sync_at": "2025-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+**UI Usage:**
+- Display student basic info from `student` object
+- Show `totalSolved` as main progress metric
+- Use `platforms` for platform-wise progress charts
+- Use `difficulty` for difficulty breakdown
+- Use `type` for homework vs classwork comparison
+- Display `topicStats` as topic-wise progress bars
+- Show `recentActivity` as latest solutions
+
+---
+
+### **Create Student**
+
+**Endpoint:** `POST /api/admin/students`
+
+**Request Body:**
+```json
+{
+  "name": "Jane Smith",
+  "email": "jane@example.com",
+  "username": "janesmith",
+  "password": "securePassword123",
+  "enrollment_id": "EN2025002",
+  "batch_id": 3,
+  "leetcode_id": "janesmith_lc",
+  "gfg_id": "janesmith_gfg"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Student created successfully",
+  "data": {
+    "id": 124,
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "username": "janesmith"
+  }
+}
+```
+
+---
+
+### **Update Student**
+
+**Endpoint:** `PATCH /api/admin/students/{id}`
+
+**Request Body:**
+```json
+{
+  "name": "Jane Smith Updated",
+  "leetcode_id": "janesmith_new_lc"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Student updated successfully",
+  "data": {
+    "id": 124,
+    "name": "Jane Smith Updated",
+    "leetcode_id": "janesmith_new_lc"
+  }
+}
+```
+
+---
+
+### **Delete Student**
+
+**Endpoint:** `DELETE /api/admin/students/{id}`
+
+**Response:**
+```json
+{
+  "message": "Student deleted permanently"
+}
+```
+
+---
+
+### **Add Student Progress**
+
+**Endpoint:** `POST /api/admin/students/progress`
+
+**Request Body:**
+```json
+{
+  "student_id": 123,
+  "question_id": 456
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Student progress added successfully",
+  "data": {
+    "id": 789,
+    "student_id": 123,
+    "question_id": 456,
+    "sync_at": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+---
+
+### **Manual Sync Student**
+
+**Endpoint:** `POST /api/admin/students/sync/{id}`
+
+**Behavior**
+Manually triggers a sync of student's progress from LeetCode and GFG platforms.
+
+**Response:**
+```json
+{
+  "message": "Student sync completed successfully",
+  "data": {
+    "leetcode_synced": 89,
+    "gfg_synced": 145,
+    "last_synced_at": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+---
+
+### **Bulk Student Upload**
+
+**Endpoint:** `POST /api/admin/bulk-operations`
+
+**Request:** (multipart/form-data)
+- `file`: CSV file with student data
+
+**CSV Format:**
+```csv
+name,email,username,password,enrollment_id,batch_id,leetcode_id,gfg_id
+John Doe,john@example.com,johndoe,password123,EN2025001,3,johndoe_lc,johndoe_gfg
+Jane Smith,jane@example.com,janesmith,password456,EN2025002,3,janesmith_lc,janesmith_gfg
+```
+
+**Response:**
+```json
+{
+  "message": "Bulk upload completed",
+  "data": {
+    "total": 2,
+    "successful": 2,
+    "failed": 0,
+    "errors": []
+  }
+}
+```
+
+---
+
+## � Questions Library
 
 ### **Get Questions Library**
 
@@ -571,7 +868,22 @@ DELETE /api/admin/bangalore-so-batch-2025/topics/arrays/classes/array-basics/que
 
 ---
 
-## �️ Filters Reference
+## 🔍 Filters Reference
+
+### **Student Management Filters**
+| Filter | Type | Description | Example |
+|--------|------|-------------|---------|
+| `search` | string | Search by name, email, username, or enrollment ID | `"john"` |
+| `city` | string | Filter by city name | `"Bangalore"` |
+| `batchSlug` | string | Filter by batch slug | `"bangalore-so-batch-2025"` |
+| `sortBy` | string | Sort field | `"created_at"`, `"totalSolved"`, `"name"` |
+| `order` | string | Sort order | `"asc"`, `"desc"` |
+| `page` | number | Pagination page (default: 1) | `1` |
+| `limit` | number | Results per page (default: 10) | `10` |
+| `minGlobalRank` | number | Minimum global rank filter | `1` |
+| `maxGlobalRank` | number | Maximum global rank filter | `50` |
+| `minCityRank` | number | Minimum city rank filter | `1` |
+| `maxCityRank` | number | Maximum city rank filter | `20` |
 
 ### **Statistics Filters**
 | Filter | Type | Description | Example |
@@ -616,6 +928,15 @@ DELETE /api/admin/bangalore-so-batch-2025/topics/arrays/classes/array-basics/que
 - Token contains default batch/city context
 - Use token in Authorization header
 - Allow admin to switch between accessible batches/cities
+
+### **Student Management**
+- Get students: `GET /api/admin/students`
+- Request: `?search=john&page=1&limit=10&minGlobalRank=1&maxGlobalRank=50`
+- Response: Students with ranks and pagination
+- Create: `POST /api/admin/students`
+- Update: `PATCH /api/admin/students/{id}`
+- Delete: `DELETE /api/admin/students/{id}`
+- Student report: `GET /api/admin/students/{username}`
 
 ### **Statistics**
 - Get stats: `POST /api/admin/stats`
