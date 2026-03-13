@@ -86,29 +86,15 @@ const getStudentLeaderboard = async (req, res) => {
         const pagination = { page: 1, limit: 10 };
         let search = username;
         const top10Result = await (0, leaderboard_service_1.getLeaderboardWithPagination)(filters, pagination, search);
-        // Step 7 — Get logged-in student's rank
-        const studentPagination = { page: 1, limit: 1000 }; // Get more results to find student
-        const allStudentsResult = await (0, leaderboard_service_1.getLeaderboardWithPagination)(filters, studentPagination, null);
-        const studentEntry = allStudentsResult.leaderboard.find((entry) => entry.student_id === studentId);
+        // Step 7 — Get logged-in student's rank using direct query
+        const studentEntry = await (0, leaderboard_service_1.getStudentRankDirect)(studentId, filters);
         // Step 8 — Prepare yourRank response
         let yourRank = null;
         let rankMessage = null;
         if (studentEntry) {
             // Get rankings based on the selected time period
-            let globalRank, cityRank;
-            switch (filters.type) {
-                case 'weekly':
-                    globalRank = studentEntry.weekly_global_rank;
-                    cityRank = studentEntry.weekly_city_rank;
-                    break;
-                case 'monthly':
-                    globalRank = studentEntry.monthly_global_rank;
-                    cityRank = studentEntry.monthly_city_rank;
-                    break;
-                default:
-                    globalRank = studentEntry.alltime_global_rank;
-                    cityRank = studentEntry.alltime_city_rank;
-            }
+            let globalRank = studentEntry.global_rank;
+            let cityRank = studentEntry.city_rank;
             yourRank = {
                 global_rank: globalRank,
                 city_rank: cityRank,

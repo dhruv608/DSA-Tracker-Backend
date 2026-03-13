@@ -1,5 +1,22 @@
 import prisma from "../config/prisma";
 
+export const getAvailableYears = async () => {
+  const years = await prisma.batch.findMany({
+    select: { year: true },
+    distinct: ['year'],
+    orderBy: { year: 'desc' }
+  });
+  return years.map(y => y.year);
+};
+
+export const getAvailableCities = async () => {
+  const cities = await prisma.city.findMany({
+    select: { city_name: true },
+    orderBy: { city_name: 'asc' }
+  });
+  return cities.map(c => c.city_name);
+};
+
 export const getLeaderboardService = async (query: any) => {
     let { type = "all", city = "all", year = null } = query;
 
@@ -9,8 +26,8 @@ export const getLeaderboardService = async (query: any) => {
         throw new Error(`Invalid type parameter. Must be one of: ${validTypes.join(", ")}`);
     }
 
-    // Validate year parameter - leaderboard is year-wise, so "all" is not valid
-    const validYears = [2024, 2025]; // Available batch years
+    // Validate year parameter - get from database
+    const validYears = await getAvailableYears();
     if (year && year !== "all" && !validYears.includes(year)) {
         throw new Error(`Invalid year parameter. Must be one of: ${validYears.join(", ")}`);
     }
@@ -38,9 +55,13 @@ export const getLeaderboardService = async (query: any) => {
         }
 
         // Build filters - year is now always required
-        let whereClause = `WHERE b.year = ${year}`;
+        const params: any[] = [];
+        let whereClause = `WHERE b.year = $${params.length}`;
+        params.push(year);
+        
         if (city && city !== "all") {
-            whereClause += ` AND c.city_name = '${city}'`;
+            whereClause += ` AND c.city_name = $${params.length}`;
+            params.push(city);
         }
 
         const leaderboardQuery = `
@@ -83,7 +104,7 @@ export const getLeaderboardService = async (query: any) => {
             LIMIT 100
         `;
 
-        const leaderboardData = await prisma.$queryRawUnsafe(leaderboardQuery);
+        const leaderboardData = await prisma.$queryRawUnsafe(leaderboardQuery, ...params);
 
         // Normalize results
         const normalized = (leaderboardData as any[]).map((row) => ({
@@ -131,8 +152,8 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
             throw new Error(`Invalid type parameter. Must be one of: ${validTypes.join(", ")}`);
         }
 
-        // Validate year parameter - leaderboard is year-wise, so "all" is not valid
-        const validYears = [2024, 2025]; // Available batch years
+        // Validate year parameter - get from database
+        const validYears = await getAvailableYears();
         if (year && year !== "all" && !validYears.includes(year)) {
             throw new Error(`Invalid year parameter. Must be one of: ${validYears.join(", ")}`);
         }
@@ -159,12 +180,18 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
         }
 
         // Build filters - year is now always required
-        let whereClause = `WHERE b.year = ${year}`;
+        const params: any[] = [];
+        let whereClause = `WHERE b.year = $${params.length}`;
+        params.push(year);
+        
         if (city && city !== "all") {
-            whereClause += ` AND c.city_name = '${city}'`;
+            whereClause += ` AND c.city_name = $${params.length}`;
+            params.push(city);
         }
+        
         if (search) {
-            whereClause += ` AND (s.name ILIKE '%${search}%' OR s.username ILIKE '%${search}%')`;
+            whereClause += ` AND (s.name ILIKE $${params.length} OR s.username ILIKE $${params.length + 1})`;
+            params.push(`%${search}%`, `%${search}%`);
         }
 
         // Get total count
@@ -177,7 +204,7 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
             ${whereClause}
         `;
         
-        const totalCount = await prisma.$queryRawUnsafe(countQuery);
+        const totalCount = await prisma.$queryRawUnsafe(countQuery, ...params);
         const total = Number((totalCount as any[])[0]?.total || 0);
 
         // Get leaderboard data
@@ -221,7 +248,7 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
             LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
 
-        const leaderboardData = await prisma.$queryRawUnsafe(leaderboardQuery);
+        const leaderboardData = await prisma.$queryRawUnsafe(leaderboardQuery, ...params);
 
         // Normalize results
         const normalized = (leaderboardData as any[]).map((row) => ({
@@ -262,6 +289,60 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
 
     } catch (error) {
         console.error("Leaderboard service error:", error);
+        throw new Error(error instanceof Error ? error.message : String(error));
+    }
+};
+
+export const getStudentRankDirect = async (studentId: number, filters: any) => {
+    try {
+        const { type = "all", city = "all", year } = filters;
+        
+        // Dynamic rank selection based on time period
+        let rankField = "l.alltime_global_rank";
+        let cityRankField = "l.alltime_city_rank";
+        
+        if (type === "weekly") {
+            rankField = "l.weekly_global_rank";
+            cityRankField = "l.weekly_city_rank";
+        } else if (type === "monthly") {
+            rankField = "l.monthly_global_rank";
+            cityRankField = "l.monthly_city_rank";
+        }
+
+        const params: any[] = [studentId, year];
+        let cityFilter = "";
+        
+        if (city && city !== "all") {
+            cityFilter = `AND c.city_name = $${params.length}`;
+            params.push(city);
+        }
+        
+        const query = `
+            SELECT ${rankField} as global_rank, ${cityRankField} as city_rank,
+                   s.name, s.username, c.city_name, b.year,
+                   l.hard_solved, l.medium_solved, l.easy_solved,
+                   l.current_streak, l.max_streak,
+                   l.hard_solved + l.medium_solved + l.easy_solved AS total_solved,
+                   ROUND(
+                       (l.hard_solved::numeric / NULLIF(b.hard_assigned,0) * 20) +
+                       (l.medium_solved::numeric / NULLIF(b.medium_assigned,0) * 15) +
+                       (l.easy_solved::numeric / NULLIF(b.easy_assigned,0) * 10), 2
+                   ) AS score,
+                   ROUND((l.hard_solved::numeric / NULLIF(b.hard_assigned,0) * 100), 2) AS hard_completion,
+                   ROUND((l.medium_solved::numeric / NULLIF(b.medium_assigned,0) * 100), 2) AS medium_completion,
+                   ROUND((l.easy_solved::numeric / NULLIF(b.easy_assigned,0) * 100), 2) AS easy_completion
+            FROM "Leaderboard" l
+            JOIN "Student" s ON s.id = l.student_id
+            JOIN "Batch" b ON b.id = s.batch_id
+            JOIN "City" c ON c.id = s.city_id
+            WHERE l.student_id = $1 AND b.year = $2 ${cityFilter}
+        `;
+        
+        const result = await prisma.$queryRawUnsafe(query, ...params);
+        return (result as any[])[0] || null;
+        
+    } catch (error) {
+        console.error("Student rank lookup error:", error);
         throw new Error(error instanceof Error ? error.message : String(error));
     }
 };

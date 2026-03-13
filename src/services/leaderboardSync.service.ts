@@ -2,15 +2,22 @@ import prisma from "../config/prisma";
 import { calculateStreakByActivity } from "../utils/streakCalculator";
 
 export const syncLeaderboardData = async () => {
+  const syncStart = Date.now();
   console.log("🔄 Starting leaderboard sync...");
 
   try {
-    // Step 1: Clear existing leaderboard
-    await prisma.$executeRaw`TRUNCATE TABLE "Leaderboard"`;
-    console.log("🧹 Cleared existing leaderboard");
+    let result: any[] = [];
+    
+    // Use transaction for atomicity
+    await prisma.$transaction(async (tx) => {
+      const truncateStart = Date.now();
+      // Step 1: Clear existing leaderboard
+      await tx.$executeRaw`TRUNCATE TABLE "Leaderboard"`;
+      console.log(`🧹 Cleared existing leaderboard in ${Date.now() - truncateStart}ms`);
 
-    // Step 2: Calculate and insert new data with time-based rankings
-    const result = await prisma.$queryRawUnsafe<any>(`
+      const calculationStart = Date.now();
+      // Step 2: Calculate and insert new data with time-based rankings
+      result = await tx.$queryRawUnsafe<any>(`
       WITH student_solves_all AS (
         SELECT
           sp.student_id,
@@ -172,51 +179,55 @@ export const syncLeaderboardData = async () => {
         alltime_global_rank,
         alltime_city_rank
       FROM ranked_stats
-    `);
-
-    console.log(`📊 Calculated data for ${result.length} students`);
-
-    // Step 3: Bulk upsert new data with streak calculation
-    if (result.length > 0) {
-      const values = result.map((row: any) => {
-        // Calculate streaks for this student
-        const activityDates = row.activity_dates || [];
-        const streaks = calculateStreakByActivity(activityDates);
-        
-        return `(${row.student_id}, ${row.hard_solved}, ${row.medium_solved}, ${row.easy_solved}, ${streaks.currentStreak}, ${streaks.maxStreak}, ${row.weekly_global_rank}, ${row.weekly_city_rank}, ${row.monthly_global_rank}, ${row.monthly_city_rank}, ${row.alltime_global_rank}, ${row.alltime_city_rank}, NOW())`;
-      }).join(',');
-
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "Leaderboard" (
-          student_id, hard_solved, medium_solved, easy_solved, 
-          current_streak, max_streak,
-          weekly_global_rank, weekly_city_rank,
-          monthly_global_rank, monthly_city_rank,
-          alltime_global_rank, alltime_city_rank,
-          last_calculated
-        ) VALUES ${values}
-        ON CONFLICT (student_id) DO UPDATE SET
-          hard_solved = EXCLUDED.hard_solved,
-          medium_solved = EXCLUDED.medium_solved,
-          easy_solved = EXCLUDED.easy_solved,
-          current_streak = EXCLUDED.current_streak,
-          max_streak = EXCLUDED.max_streak,
-          weekly_global_rank = EXCLUDED.weekly_global_rank,
-          weekly_city_rank = EXCLUDED.weekly_city_rank,
-          monthly_global_rank = EXCLUDED.monthly_global_rank,
-          monthly_city_rank = EXCLUDED.monthly_city_rank,
-          alltime_global_rank = EXCLUDED.alltime_global_rank,
-          alltime_city_rank = EXCLUDED.alltime_city_rank,
-          last_calculated = NOW()
       `);
 
-      console.log(`✅ Upserted ${result.length} student records`);
-    }
+      console.log(`📊 Calculated data for ${result.length} students in ${Date.now() - calculationStart}ms`);
 
-    console.log("🎉 Leaderboard sync completed successfully");
+      // Step 3: Bulk upsert new data with streak calculation
+      if (result.length > 0) {
+        const insertStart = Date.now();
+        const values = result.map((row: any) => {
+          // Calculate streaks for this student
+          const activityDates = row.activity_dates || [];
+          const streaks = calculateStreakByActivity(activityDates);
+          
+          return `(${row.student_id}, ${row.hard_solved}, ${row.medium_solved}, ${row.easy_solved}, ${streaks.currentStreak}, ${streaks.maxStreak}, ${row.weekly_global_rank}, ${row.weekly_city_rank}, ${row.monthly_global_rank}, ${row.monthly_city_rank}, ${row.alltime_global_rank}, ${row.alltime_city_rank}, NOW())`;
+        }).join(',');
+
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "Leaderboard" (
+            student_id, hard_solved, medium_solved, easy_solved, 
+            current_streak, max_streak,
+            weekly_global_rank, weekly_city_rank,
+            monthly_global_rank, monthly_city_rank,
+            alltime_global_rank, alltime_city_rank,
+            last_calculated
+          ) VALUES ${values}
+          ON CONFLICT (student_id) DO UPDATE SET
+            hard_solved = EXCLUDED.hard_solved,
+            medium_solved = EXCLUDED.medium_solved,
+            easy_solved = EXCLUDED.easy_solved,
+            current_streak = EXCLUDED.current_streak,
+            max_streak = EXCLUDED.max_streak,
+            weekly_global_rank = EXCLUDED.weekly_global_rank,
+            weekly_city_rank = EXCLUDED.weekly_city_rank,
+            monthly_global_rank = EXCLUDED.monthly_global_rank,
+            monthly_city_rank = EXCLUDED.monthly_city_rank,
+            alltime_global_rank = EXCLUDED.alltime_global_rank,
+            alltime_city_rank = EXCLUDED.alltime_city_rank,
+            last_calculated = NOW()
+        `);
+
+        console.log(`✅ Upserted ${result.length} student records in ${Date.now() - insertStart}ms`);
+      }
+    });
+
+    const totalTime = Date.now() - syncStart;
+    console.log(`🎉 Leaderboard sync completed successfully in ${totalTime}ms (${(totalTime/1000).toFixed(2)}s)`);
     return {
       success: true,
-      studentsProcessed: result.length
+      studentsProcessed: result.length,
+      duration: totalTime
     };
 
   } catch (error) {
