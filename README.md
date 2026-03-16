@@ -1,4 +1,4 @@
-# DSA Tracker Backend
+# DSA Tracker Backend Core
 
 <div align="center">
 
