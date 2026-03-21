@@ -440,11 +440,11 @@ export const googleLogin = async (req: Request, res: Response) => {
       try {
         const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
         const tokenInfo: any = await response.json();
-        
+
         if (tokenInfo.error) {
           throw new Error(tokenInfo.error);
         }
-        
+
         return tokenInfo;
       } catch (error) {
         throw new Error('Failed to verify Google token');
@@ -607,15 +607,15 @@ export const forgotPassword = async (req: Request, res: Response) => {
     // Check if user exists (student or admin)
     let user = null;
     user = await prisma.student.findUnique({ where: { email } });
-    
+
     if (!user) {
       user = await prisma.admin.findUnique({ where: { email } });
     }
 
     if (!user) {
       console.log(`User not found for email: ${email}`);
-      return res.json({ 
-        message: 'If an account with this email exists, an OTP has been sent' 
+      return res.json({
+        message: 'If an account with this email exists, an OTP has been sent'
       });
     }
 
@@ -632,11 +632,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
       EMAIL_PASS_SET: !!process.env.EMAIL_PASS,
       EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail'
     });
-    
+
     await sendOTPEmail(email, otp, user?.name);
     console.log('OTP email sent successfully!');
 
-    res.json({ 
+    res.json({
       message: 'OTP sent to your email address',
       otp: otp  // Return OTP for testing
     });
@@ -652,8 +652,8 @@ export const resetPassword = async (req: Request, res: Response) => {
     const { email, otp, newPassword } = req.body;
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ 
-        error: 'Email, OTP, and new password are required' 
+      return res.status(400).json({
+        error: 'Email, OTP, and new password are required'
       });
     }
 
@@ -667,8 +667,8 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     // Validate password strength
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        error: 'Password must be at least 6 characters long' 
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters long'
       });
     }
 
@@ -676,7 +676,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     console.log(`Attempting to validate OTP: ${otp} for email: ${email}`);
     const isValidOTP = await validateOTP(email, otp);
     console.log(`OTP validation result: ${isValidOTP}`);
-    
+
     if (!isValidOTP) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
@@ -684,7 +684,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     // Find user and update password
     let user = null;
     user = await prisma.student.findUnique({ where: { email } });
-    
+
     let userType = '';
     if (user) {
       userType = 'student';
@@ -715,8 +715,8 @@ export const resetPassword = async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ 
-      message: 'Password reset successful. You can now login with your new password.' 
+    res.json({
+      message: 'Password reset successful. You can now login with your new password.'
     });
   } catch (error) {
     console.error('Reset password error:', error);

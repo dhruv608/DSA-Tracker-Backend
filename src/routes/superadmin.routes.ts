@@ -17,7 +17,7 @@ import {
 } from "../controllers/batch.controller";
 
 // Admin management
-import { getAdminStats, getAllAdminsController, updateAdminController, deleteAdminController, createAdminController } from "../controllers/admin.controller";
+import { getAllAdminsController, updateAdminController, deleteAdminController, createAdminController } from "../controllers/admin.controller";
 import { getSuperAdminStats } from "../controllers/superadminStats.controller";
 
 const router = Router();

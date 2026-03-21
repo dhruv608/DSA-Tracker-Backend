@@ -1752,21 +1752,29 @@ All SuperAdmin endpoints require **authentication + SUPERADMIN role**.
     "updated_at": "2024-01-01T12:00:00.000Z"
   }
 }
-```
-
-##### 3.4 Delete Admin
 **Endpoint:** `DELETE /api/superadmin/admins/:id`
 
-**Description:** Delete an admin.
+**Description:** Delete an admin (cannot delete SUPERADMIN role users).
 
 **Path Parameters:**
 - `id`: Admin ID
+
+**Security Constraint:** Only SuperAdmins can delete admins. Attempting to delete a SuperAdmin will result in an error.
 
 **Response:**
 ```json
 {
   "success": true,
   "message": "Admin deleted successfully"
+}
+```
+
+**Error Response (when trying to delete SUPERADMIN):**
+```json
+{
+  "success": false,
+  "error": "Cannot delete SUPERADMIN role users",
+  "details": "Insufficient permissions"
 }
 ```
 
