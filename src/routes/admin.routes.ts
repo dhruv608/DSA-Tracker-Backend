@@ -8,6 +8,7 @@ import { createBatch, getAllBatches } from "../controllers/batch.controller";
 import { createTopic, deleteTopic, getAllTopics, getTopicsForBatch, updateTopic } from "../controllers/topic.controller";
 import { createQuestion, deleteQuestion, getAllQuestions, getAssignedQuestionsController, updateQuestion } from "../controllers/question.controller";
 import { bulkUploadQuestions } from "../controllers/questionBulk.controller";
+import { uploadImage } from "../middlewares/imageUpload.middleware";
 import { upload } from "../middlewares/upload.middleware";
 import { getAdminStats } from "../controllers/admin.controller";
 import { downloadBatchReportController } from "../controllers/csv.controller";
@@ -47,9 +48,10 @@ router.get("/batches", getAllBatches);
 
 // Global Topics
 router.get("/topics", getAllTopics);
-router.post("/topics", isTeacherOrAbove, createTopic);
-router.patch("/topics/:id", isTeacherOrAbove, updateTopic);
-router.delete("/topics/:id", isTeacherOrAbove, deleteTopic);
+router.post("/topics", isTeacherOrAbove, uploadImage.single('photo'), createTopic);
+router.put("/topics/:topicSlug", isTeacherOrAbove, uploadImage.single('photo'), updateTopic);
+router.patch("/topics/:topicSlug", isTeacherOrAbove, uploadImage.single('photo'), updateTopic);
+router.delete("/topics/:topicSlug", isTeacherOrAbove, deleteTopic);
 
 //  WORKSPACE ROUTES (BATCH CONTEXT)
 // questions gloabal 

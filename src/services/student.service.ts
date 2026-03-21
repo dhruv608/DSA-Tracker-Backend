@@ -95,7 +95,10 @@ export const getAllStudentsService = async (query: any) => {
             SELECT 
                 student_id,
                 alltime_global_rank as global_rank,
-                alltime_city_rank as city_rank
+                alltime_city_rank as city_rank,
+                easy_solved,
+                medium_solved,
+                hard_solved
             FROM "Leaderboard"
             WHERE student_id = ANY($1)
         `;
@@ -152,6 +155,13 @@ export const getAllStudentsService = async (query: any) => {
                 // Leaderboard ranks
                 global_rank: leaderboard?.global_rank || null,
                 city_rank: leaderboard?.city_rank || null,
+
+                stats: {
+                    total_solved: student._count.progress,
+                    easy_solved: leaderboard?.easy_solved || 0,
+                    medium_solved: leaderboard?.medium_solved || 0,
+                    hard_solved: leaderboard?.hard_solved || 0
+                },
 
                 provider: student.provider,
                 last_synced_at: student.last_synced_at,

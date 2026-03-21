@@ -1,18 +1,22 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { createTopicService, deleteTopicService, getAllTopicsService, getTopicsForBatchService, updateTopicService, getTopicsWithBatchProgressService, getTopicOverviewWithClassesSummaryService } from "../services/topic.service";
-
-
-
+import { upload } from "../middlewares/upload.middleware";
 
 export const createTopic = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const { topic_name } = req.body;
+    console.log("Create Topic req.body:", req.body);
+    const topic_name = req.body?.topic_name;
+    const photo = req.file;
 
-    const topic = await createTopicService({ topic_name });
+    if (!topic_name) {
+      return res.status(400).json({ message: "Topic name required" });
+    }
+
+    const topic = await createTopicService({ topic_name, photo });
 
     return res.status(201).json({
       message: "Topic created successfully",
@@ -45,11 +49,12 @@ export const getTopicsForBatch = async (
 try {
     const batch = (req as any).batch;
 
-    const topics = await getTopicsForBatchService({
+    const data = await getTopicsForBatchService({
       batchId: batch.id,
+      query: req.query
     });
 
-    return res.json(topics);
+    return res.json(data);
 
   } catch (error: any) {
     return res.status(500).json({
@@ -60,12 +65,21 @@ try {
 
 export const updateTopic = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { topic_name } = req.body;
+    console.log("Update Topic req.body:", req.body);
+    const topicSlug = req.params.topicSlug as string;
+    const topic_name = req.body?.topic_name;
+    const removePhoto = req.body?.removePhoto;
+    const photo = req.file;
+
+    if (!topic_name) {
+      return res.status(400).json({ message: "Topic name required" });
+    }
 
     const topic = await updateTopicService({
-      id: Number(id),
+      topicSlug,
       topic_name,
+      photo,
+      removePhoto: removePhoto === 'true' || removePhoto === true,
     });
 
     return res.json({
@@ -82,10 +96,10 @@ export const updateTopic = async (req: Request, res: Response) => {
 
 export const deleteTopic = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const topicSlug = req.params.topicSlug as string;
 
     await deleteTopicService({
-      id: Number(id),
+      topicSlug,
     });
 
     return res.json({

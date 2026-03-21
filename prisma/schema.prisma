@@ -90,6 +90,7 @@ model Topic {
   created_at  DateTime   @default(now())
   slug        String     @unique @db.VarChar(80)
   description String?
+  photo_url   String?    @db.VarChar(500)
   order       Int        @default(0)
   updated_at  DateTime   @updatedAt
   classes     Class[]
