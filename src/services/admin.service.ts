@@ -77,13 +77,17 @@ export const createAdminService = async (adminData: any) => {
             }
         }
 
-        // Validate batch_id if provided
+        // Validate batch_id if provided and derive city_id
         if (adminData.batch_id) {
             const batch = await prisma.batch.findUnique({
                 where: { id: adminData.batch_id }
             });
             if (!batch) {
                 throw new Error('Batch not found');
+            }
+            // Automatically set city_id from batch if not explicitly provided
+            if (!adminData.city_id) {
+                adminData.city_id = batch.city_id;
             }
         }
 
@@ -110,7 +114,9 @@ export const createAdminService = async (adminData: any) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             }
@@ -164,7 +170,9 @@ export const getAllAdminsService = async (filters: any = {}) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             },
@@ -227,7 +235,7 @@ export const updateAdminService = async (id: number, updateData: any) => {
             }
         }
 
-        // Validate batch_id if provided
+        // Validate batch_id if provided and derive city_id
         if (updateData.batch_id) {
             const batch = await prisma.batch.findUnique({
                 where: { id: updateData.batch_id }
@@ -235,6 +243,8 @@ export const updateAdminService = async (id: number, updateData: any) => {
             if (!batch) {
                 throw new Error('Batch not found');
             }
+            // Automatically set city_id from batch
+            updateData.city_id = batch.city_id;
         }
 
         // Hash password if provided
@@ -260,7 +270,9 @@ export const updateAdminService = async (id: number, updateData: any) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             }
