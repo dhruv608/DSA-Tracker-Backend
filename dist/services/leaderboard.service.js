@@ -42,6 +42,10 @@ const getLeaderboardService = async (query) => {
             year = validYears[0]; // Fallback to most recent year
         }
     }
+    // If there's still no valid year mapped (e.g. empty database), safe-exit rather than crashing SQL.
+    if (!year) {
+        return [];
+    }
     try {
         // Dynamic rank selection based on time period
         let globalRankField = "l.alltime_global_rank";
@@ -180,6 +184,13 @@ const getLeaderboardWithPagination = async (filters, pagination, search) => {
             if (!validYears.includes(year)) {
                 year = validYears[0]; // Fallback to most recent year
             }
+        }
+        // If there's no valid year (empty DB), gracefully return an empty set.
+        if (!year) {
+            return {
+                leaderboard: [],
+                pagination: { page, limit, total: 0, totalPages: 0 }
+            };
         }
         // Dynamic rank selection based on time period
         let globalRankField = "l.alltime_global_rank";

@@ -10,7 +10,18 @@ const getStudentProfileService = async (studentId) => {
         // 1️⃣ Get student basic info + leaderboard
         const student = await prisma_1.default.student.findUnique({
             where: { id: studentId },
-            include: {
+            select: {
+                id: true,
+                name: true,
+                username: true,
+                email: true,
+                enrollment_id: true,
+                github: true,
+                linkedin: true,
+                leetcode_id: true,
+                gfg_id: true,
+                profile_image_url: true,
+                batch_id: true,
                 city: true,
                 batch: true,
                 leaderboards: true,
@@ -70,7 +81,8 @@ const getStudentProfileService = async (studentId) => {
                 github: student.github,
                 linkedin: student.linkedin,
                 leetcode: student.leetcode_id,
-                gfg: student.gfg_id
+                gfg: student.gfg_id,
+                profileImageUrl: student.profile_image_url
             },
             codingStats: {
                 totalSolved: student._count.progress,
@@ -116,7 +128,16 @@ exports.getStudentProfileService = getStudentProfileService;
 const getPublicStudentProfileService = async (username) => {
     const student = await prisma_1.default.student.findUnique({
         where: { username },
-        include: {
+        select: {
+            id: true,
+            name: true,
+            username: true,
+            github: true,
+            linkedin: true,
+            leetcode_id: true,
+            gfg_id: true,
+            profile_image_url: true,
+            batch_id: true,
             city: true,
             batch: true,
             leaderboards: true,
@@ -173,7 +194,8 @@ const getPublicStudentProfileService = async (username) => {
             github: student.github,
             linkedin: student.linkedin,
             leetcode: student.leetcode_id,
-            gfg: student.gfg_id
+            gfg: student.gfg_id,
+            profileImageUrl: student.profile_image_url
         },
         codingStats: {
             totalSolved: student._count.progress,

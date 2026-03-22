@@ -9,12 +9,14 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const yamljs_1 = __importDefault(require("yamljs"));
 const path_1 = __importDefault(require("path"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const errorHandler_middleware_1 = require("./middlewares/errorHandler.middleware");
 const student_routes_1 = __importDefault(require("./routes/student.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const superadmin_routes_1 = __importDefault(require("./routes/superadmin.routes"));
 const sync_job_1 = require("./jobs/sync.job");
+const s3_routes_1 = __importDefault(require("./routes/s3.routes"));
 dotenv_1.default.config();
 // Swagger UI Integration
 // Load OpenAPI YAML specification
@@ -22,11 +24,16 @@ const openApiSpec = yamljs_1.default.load(path_1.default.join(__dirname, '../doc
 const app = (0, express_1.default)();
 // Middlewares
 app.use((0, cors_1.default)({
-    origin: ['http://localhost:5000', 'http://127.0.0.1:5501', 'http://localhost:5501'],
-    credentials: true
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+app.use((0, cookie_parser_1.default)());
+// S3 Routes 
+app.use('/api/s3', s3_routes_1.default);
 // Routes
 app.use('/api/auth', auth_routes_1.default);
 app.use("/api/students", student_routes_1.default);

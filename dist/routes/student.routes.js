@@ -9,6 +9,8 @@ const class_controller_1 = require("../controllers/class.controller");
 const questionVisibility_controller_1 = require("../controllers/questionVisibility.controller");
 const leaderboard_controller_1 = require("../controllers/leaderboard.controller");
 const studentProfile_controller_1 = require("../controllers/studentProfile.controller");
+const uploadphoto_middleware_1 = require("../middlewares/uploadphoto.middleware");
+const profileImage_controller_1 = require("../controllers/profileImage.controller");
 const router = (0, express_1.Router)();
 // Public route - no authentication required
 router.get("/profile/:username", studentProfile_controller_1.getPublicStudentProfile); // Public student profile by username
@@ -23,12 +25,9 @@ router.get("/topics/:topicSlug/classes/:classSlug", class_controller_1.getClassD
 router.get("/addedQuestions", questionVisibility_controller_1.getAllQuestionsWithFilters); // All questions with filters and solved status
 // ===== LEADERBOARD ROUTES =====
 router.post("/leaderboard", leaderboard_controller_1.getStudentLeaderboard); // Single student leaderboard with top 10 and personal rank
+// ===== PROFILE IMAGE ROUTES =====
+router.post("/profile-image", uploadphoto_middleware_1.uploadSingle, profileImage_controller_1.uploadProfileImage); // Upload/Update profile image
+router.delete("/profile-image", profileImage_controller_1.deleteProfileImage); // Delete profile image
+router.get("/profile-image", profileImage_controller_1.getProfileImage); // Get profile image URL
 router.get("/profile", studentProfile_controller_1.getStudentProfile); // Complete student profile with all sections
-// router.get("/test/basic", testStudentBasicInfo);
-// router.get("/test/stats", testCodingStats);
-// router.get("/test/streak", testStreak);
-// router.get("/test/leaderboard", testLeaderboard);
-// router.get("/test/heatmap", testHeatmap);
-// router.get("/test/topic", testTopicProgress);
-// router.get("/test/activity", testRecentActivity);
 exports.default = router;

@@ -1,7 +1,24 @@
 import { Request, Response } from "express";
-import { getLeaderboardWithPagination, getStudentRankDirect } from "../services/leaderboard.service";
+import { getLeaderboardWithPagination, getStudentRankDirect, getAvailableYears } from "../services/leaderboard.service";
 import { syncLeaderboardData } from "../services/leaderboardSync.service";
 import prisma from "../config/prisma";
+
+// Get available years for leaderboard filters
+export const getAvailableYearsController = async (req: Request, res: Response) => {
+    try {
+        const years = await getAvailableYears();
+        return res.status(200).json({
+            success: true,
+            years: years
+        });
+    } catch (error) {
+        console.error("Error fetching available years:", error);
+        return res.status(500).json({
+            success: false,
+            message: error instanceof Error ? error.message : "Failed to fetch available years"
+        });
+    }
+};
 
 // Admin Leaderboard API with pagination and search
 export const getAdminLeaderboard = async (req: Request, res: Response) => {
@@ -29,7 +46,7 @@ export const getAdminLeaderboard = async (req: Request, res: Response) => {
         // Step 5 — Use optimized service
         const result = await getLeaderboardWithPagination(filters, pagination, search as string);
         
-        // Step 6 — Format leaderboard with simplified data and dynamic rank
+        // Step 6 — Format leaderboard with explicitly requested data mapping
         const formattedLeaderboard = result.leaderboard.map(entry => {
             // Determine which rank fields to use based on type
             let globalRank, cityRank;
@@ -53,12 +70,15 @@ export const getAdminLeaderboard = async (req: Request, res: Response) => {
                 username: entry.username,
                 batch_year: entry.batch_year,
                 city_name: entry.city_name,
-                max_streak: entry.max_streak,
-                easy_solved: entry.easy_completion || 0,
-                medium_solved: entry.medium_completion || 0,
-                hard_solved: entry.hard_completion || 0,
-                total_solved: (((entry.easy_completion || 0) + (entry.medium_completion || 0) + (entry.hard_completion || 0)) / 3).toFixed(2),
-                rank: filters.city === 'all' ? globalRank : cityRank
+                max_streak: entry.max_streak || 0,
+                easy_completion: Number(entry.easy_completion || 0),
+                medium_completion: Number(entry.medium_completion || 0),
+                hard_completion: Number(entry.hard_completion || 0),
+                total_solved: Number(entry.total_solved || 0),
+                score: Number(entry.score || 0),
+                global_rank: globalRank,
+                city_rank: cityRank,
+                last_calculated: entry.last_calculated
             };
         });
         
@@ -131,7 +151,7 @@ export const getStudentLeaderboard = async (req: Request, res: Response) => {
         
         const top10Result = await getLeaderboardWithPagination(filters, pagination, search);
         
-        // Step 8 — Format top10 leaderboard with simplified data
+        // Step 8 — Format top10 leaderboard with explicitly requested data mapping
         const formattedTop10 = top10Result.leaderboard.map(entry => {
             // Determine which rank fields to use based on type
             let globalRank, cityRank;
@@ -155,12 +175,15 @@ export const getStudentLeaderboard = async (req: Request, res: Response) => {
                 username: entry.username,
                 batch_year: entry.batch_year,
                 city_name: entry.city_name,
-                max_streak: entry.max_streak,
-                easy_solved: entry.easy_completion || 0,
-                medium_solved: entry.medium_completion || 0,
-                hard_solved: entry.hard_completion || 0,
-                total_solved: (((entry.easy_completion || 0) + (entry.medium_completion || 0) + (entry.hard_completion || 0)) / 3).toFixed(2),
-                rank: filters.city === 'all' ? globalRank : cityRank
+                max_streak: entry.max_streak || 0,
+                easy_completion: Number(entry.easy_completion || 0),
+                medium_completion: Number(entry.medium_completion || 0),
+                hard_completion: Number(entry.hard_completion || 0),
+                total_solved: Number(entry.total_solved || 0),
+                score: Number(entry.score || 0),
+                global_rank: globalRank,
+                city_rank: cityRank,
+                last_calculated: entry.last_calculated
             };
         });
         

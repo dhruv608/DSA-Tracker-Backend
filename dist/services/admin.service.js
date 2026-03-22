@@ -73,13 +73,17 @@ const createAdminService = async (adminData) => {
                 throw new Error('City not found');
             }
         }
-        // Validate batch_id if provided
+        // Validate batch_id if provided and derive city_id
         if (adminData.batch_id) {
             const batch = await prisma_1.default.batch.findUnique({
                 where: { id: adminData.batch_id }
             });
             if (!batch) {
                 throw new Error('Batch not found');
+            }
+            // Automatically set city_id from batch if not explicitly provided
+            if (!adminData.city_id) {
+                adminData.city_id = batch.city_id;
             }
         }
         // Hash password
@@ -104,7 +108,9 @@ const createAdminService = async (adminData) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             }
@@ -155,7 +161,9 @@ const getAllAdminsService = async (filters = {}) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             },
@@ -210,7 +218,7 @@ const updateAdminService = async (id, updateData) => {
                 throw new Error('City not found');
             }
         }
-        // Validate batch_id if provided
+        // Validate batch_id if provided and derive city_id
         if (updateData.batch_id) {
             const batch = await prisma_1.default.batch.findUnique({
                 where: { id: updateData.batch_id }
@@ -218,6 +226,8 @@ const updateAdminService = async (id, updateData) => {
             if (!batch) {
                 throw new Error('Batch not found');
             }
+            // Automatically set city_id from batch
+            updateData.city_id = batch.city_id;
         }
         // Hash password if provided
         if (updateData.password) {
@@ -241,7 +251,9 @@ const updateAdminService = async (id, updateData) => {
                 batch: {
                     select: {
                         id: true,
-                        batch_name: true
+                        batch_name: true,
+                        year: true,
+                        city_id: true
                     }
                 }
             }

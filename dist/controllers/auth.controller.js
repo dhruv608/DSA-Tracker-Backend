@@ -11,7 +11,7 @@ const google_auth_library_1 = require("google-auth-library");
 const otp_util_1 = require("../utils/otp.util");
 const email_util_1 = require("../utils/email.util");
 const emailValidation_util_1 = require("../utils/emailValidation.util");
-const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
 // Student Registration
 const registerStudent = async (req, res) => {
     try {
@@ -161,10 +161,17 @@ const loginStudent = async (req, res) => {
             where: { id: student.id },
             data: { refresh_token: refreshToken },
         });
+        // Set refresh token in HTTP-only cookie
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Only secure in production
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            path: '/'
+        });
         res.json({
             message: 'Login successful',
             accessToken,
-            refreshToken,
             user: {
                 id: student.id,
                 name: student.name,
@@ -243,7 +250,6 @@ const registerAdmin = async (req, res) => {
         res.status(201).json({
             message: 'Admin registered successfully',
             accessToken,
-            refreshToken,
             user: admin,
         });
     }
@@ -304,10 +310,16 @@ const loginAdmin = async (req, res) => {
             where: { id: admin.id },
             data: { refresh_token: refreshToken },
         });
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Only secure in production
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            path: '/'
+        });
         res.json({
             message: 'Login successful',
             accessToken,
-            refreshToken,
             user: {
                 id: admin.id,
                 name: admin.name,
@@ -325,7 +337,8 @@ exports.loginAdmin = loginAdmin;
 // Adding  Referesh Token API
 const refreshToken = async (req, res) => {
     try {
-        const { refreshToken } = req.body;
+        // Get refresh token from HTTP-only cookie
+        const refreshToken = req.cookies.refreshToken;
         if (!refreshToken) {
             return res.status(400).json({ error: 'Refresh token required' });
         }
@@ -364,11 +377,20 @@ const googleLogin = async (req, res) => {
             return res.status(400).json({ error: "ID token required" });
         }
         // Verify token with Google
-        const ticket = await googleClient.verifyIdToken({
-            idToken,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
-        const payload = ticket.getPayload();
+        async function verifyIdToken(idToken) {
+            try {
+                const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+                const tokenInfo = await response.json();
+                if (tokenInfo.error) {
+                    throw new Error(tokenInfo.error);
+                }
+                return tokenInfo;
+            }
+            catch (error) {
+                throw new Error('Failed to verify Google token');
+            }
+        }
+        const payload = await verifyIdToken(idToken);
         if (!payload?.email) {
             return res.status(400).json({ error: "Invalid Google token" });
         }
@@ -426,7 +448,6 @@ const googleLogin = async (req, res) => {
         res.json({
             message: "Google login successful",
             accessToken,
-            refreshToken,
             user: {
                 id: student.id,
                 name: student.name,
@@ -455,9 +476,10 @@ const logoutStudent = async (req, res) => {
                 data: { refresh_token: null }
             });
         }
+        // Clear refresh token cookie
+        res.clearCookie('refreshToken');
         res.json({
             message: "Student logout successful",
-            // Refresh token cleared from database
         });
     }
     catch (error) {
@@ -478,10 +500,10 @@ const logoutAdmin = async (req, res) => {
                 data: { refresh_token: null }
             });
         }
-        // by removing the token from storage.
+        // Clear refresh token cookie
+        res.clearCookie('refreshToken');
         res.json({
             message: "Admin logout successful",
-            // Optionally, you could add token blacklisting here if needed
         });
     }
     catch (error) {
@@ -521,18 +543,18 @@ const forgotPassword = async (req, res) => {
         console.log(`Generated OTP for ${email}: ${otp}`);
         await (0, otp_util_1.saveOTP)(email, otp);
         console.log('OTP saved to database');
-        // Send OTP email
+        // Send OTP email with user name
         console.log('Attempting to send OTP email...');
         console.log('Email config:', {
             EMAIL_USER: process.env.EMAIL_USER,
             EMAIL_PASS_SET: !!process.env.EMAIL_PASS,
             EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail'
         });
-        await (0, email_util_1.sendOTPEmail)(email, otp);
+        await (0, email_util_1.sendOTPEmail)(email, otp, user?.name);
         console.log('OTP email sent successfully!');
         res.json({
             message: 'OTP sent to your email address',
-            otp: otp // Remove this in production!
+            otp: otp // Return OTP for testing
         });
     }
     catch (error) {
@@ -564,7 +586,9 @@ const resetPassword = async (req, res) => {
             });
         }
         // Verify OTP
+        console.log(`Attempting to validate OTP: ${otp} for email: ${email}`);
         const isValidOTP = await (0, otp_util_1.validateOTP)(email, otp);
+        console.log(`OTP validation result: ${isValidOTP}`);
         if (!isValidOTP) {
             return res.status(400).json({ error: 'Invalid or expired OTP' });
         }

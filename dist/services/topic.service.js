@@ -6,7 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTopicOverviewWithClassesSummaryService = exports.getTopicsWithBatchProgressService = exports.deleteTopicService = exports.updateTopicService = exports.getTopicsForBatchService = exports.getAllTopicsService = exports.createTopicService = void 0;
 const slugify_1 = __importDefault(require("slugify"));
 const prisma_1 = __importDefault(require("../config/prisma"));
-const createTopicService = async ({ topic_name, }) => {
+const s3_service_1 = require("./s3.service");
+const createTopicService = async ({ topic_name, photo, }) => {
     if (!topic_name) {
         throw new Error("Topic name is required");
     }
@@ -22,16 +23,39 @@ const createTopicService = async ({ topic_name, }) => {
     })) {
         finalSlug = `${baseSlug}-${counter++}`;
     }
+    let photo_url = null;
+    let photoKey = null;
+    // Upload photo to S3 if provided
+    if (photo) {
+        try {
+            const uploadResult = await s3_service_1.S3Service.uploadFile(photo, 'topics');
+            photo_url = uploadResult.url;
+            photoKey = uploadResult.key;
+        }
+        catch (error) {
+            throw new Error("Failed to upload photo to S3");
+        }
+    }
     try {
         const topic = await prisma_1.default.topic.create({
             data: {
                 topic_name,
                 slug: finalSlug,
+                photo_url,
             },
         });
         return topic;
     }
     catch (error) {
+        // If database creation fails, clean up uploaded photo
+        if (photoKey) {
+            try {
+                await s3_service_1.S3Service.deleteFile(photoKey);
+            }
+            catch (cleanupError) {
+                console.error("Failed to cleanup photo after database error:", cleanupError);
+            }
+        }
         if (error.code === "P2002") {
             throw new Error("Topic already exists");
         }
@@ -46,7 +70,7 @@ const getAllTopicsService = async () => {
     return topics;
 };
 exports.getAllTopicsService = getAllTopicsService;
-const getTopicsForBatchService = async ({ batchId, }) => {
+const getTopicsForBatchService = async ({ batchId, query = {} }) => {
     const topics = await prisma_1.default.topic.findMany({
         include: {
             classes: {
@@ -67,7 +91,7 @@ const getTopicsForBatchService = async ({ batchId, }) => {
             }
         }
     });
-    const formatted = topics.map(topic => {
+    let formatted = topics.map(topic => {
         const uniqueQuestions = new Set();
         topic.classes.forEach(cls => {
             cls.questionVisibility.forEach(qv => {
@@ -78,75 +102,181 @@ const getTopicsForBatchService = async ({ batchId, }) => {
             id: topic.id,
             topic_name: topic.topic_name,
             slug: topic.slug,
+            photo_url: topic.photo_url,
             classCount: topic.classes.length,
-            questionCount: uniqueQuestions.size
+            questionCount: uniqueQuestions.size,
+            created_at: topic.created_at
         };
     });
-    return formatted;
+    // Apply Search
+    if (query.search) {
+        const st = query.search.toLowerCase();
+        formatted = formatted.filter(t => t.topic_name.toLowerCase().includes(st) || t.slug.includes(st));
+    }
+    // Apply Sorting
+    // classes, questions, recent, oldest
+    if (query.sortBy === 'classes') {
+        formatted.sort((a, b) => b.classCount - a.classCount);
+    }
+    else if (query.sortBy === 'questions') {
+        formatted.sort((a, b) => b.questionCount - a.questionCount);
+    }
+    else if (query.sortBy === 'oldest') {
+        formatted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
+    else {
+        // Default: recent
+        formatted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    // Apply Pagination
+    let page = Number(query.page) || 1;
+    let limit = Number(query.limit) || 12;
+    const totalCount = formatted.length;
+    const totalPages = Math.ceil(totalCount / limit);
+    if (page < 1)
+        page = 1;
+    const paginated = formatted.slice((page - 1) * limit, page * limit);
+    return {
+        topics: paginated,
+        pagination: {
+            page,
+            limit,
+            total: totalCount,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1
+        }
+    };
 };
 exports.getTopicsForBatchService = getTopicsForBatchService;
-const updateTopicService = async ({ id, topic_name, }) => {
-    if (!topic_name) {
-        throw new Error("Topic name is required");
-    }
+const updateTopicService = async ({ topicSlug, topic_name, photo, removePhoto, }) => {
     const existingTopic = await prisma_1.default.topic.findUnique({
-        where: { id },
+        where: { slug: topicSlug },
     });
     if (!existingTopic) {
         throw new Error("Topic not found");
     }
-    const duplicate = await prisma_1.default.topic.findUnique({
-        where: { topic_name },
-    });
-    if (duplicate && duplicate.id !== existingTopic.id) {
-        throw new Error("Topic already exists");
+    let newPhotoUrl = existingTopic.photo_url;
+    let oldPhotoKey = null;
+    // Handle photo removal
+    if (removePhoto && existingTopic.photo_url) {
+        // Extract key from URL
+        const urlParts = existingTopic.photo_url.split('/');
+        oldPhotoKey = urlParts[urlParts.length - 1];
+        if (oldPhotoKey) {
+            oldPhotoKey = `topics/${oldPhotoKey}`;
+        }
+        newPhotoUrl = null;
     }
-    const baseSlug = (0, slugify_1.default)(topic_name, {
-        lower: true,
-        strict: true,
-    });
-    let finalSlug = baseSlug;
-    let counter = 1;
-    while (await prisma_1.default.topic.findFirst({
-        where: {
-            slug: finalSlug,
-            NOT: { id: existingTopic.id },
-        },
-    })) {
-        finalSlug = `${baseSlug}-${counter++}`;
+    // Handle new photo upload
+    if (photo) {
+        try {
+            const uploadResult = await s3_service_1.S3Service.uploadFile(photo, 'topics');
+            newPhotoUrl = uploadResult.url;
+            // If we had an old photo, mark its key for deletion
+            if (existingTopic.photo_url) {
+                const urlParts = existingTopic.photo_url.split('/');
+                oldPhotoKey = `topics/${urlParts[urlParts.length - 1]}`;
+            }
+        }
+        catch (error) {
+            throw new Error("Failed to upload photo to S3");
+        }
     }
-    const updatedTopic = await prisma_1.default.topic.update({
-        where: { id },
-        data: {
-            topic_name,
-            slug: finalSlug,
-        },
-    });
-    return updatedTopic;
+    // Handle topic name update if provided
+    let finalSlug = existingTopic.slug;
+    if (topic_name) {
+        const duplicate = await prisma_1.default.topic.findUnique({
+            where: { topic_name },
+        });
+        if (duplicate && duplicate.id !== existingTopic.id) {
+            throw new Error("Topic already exists");
+        }
+        const baseSlug = (0, slugify_1.default)(topic_name, {
+            lower: true,
+            strict: true,
+        });
+        finalSlug = baseSlug;
+        let counter = 1;
+        while (await prisma_1.default.topic.findFirst({
+            where: {
+                slug: finalSlug,
+                NOT: { id: existingTopic.id },
+            },
+        })) {
+            finalSlug = `${baseSlug}-${counter++}`;
+        }
+    }
+    try {
+        const updatedTopic = await prisma_1.default.topic.update({
+            where: { id: existingTopic.id },
+            data: {
+                ...(topic_name && { topic_name }),
+                slug: finalSlug,
+                photo_url: newPhotoUrl,
+            },
+        });
+        // Clean up old photo from S3 if update was successful
+        if (oldPhotoKey) {
+            try {
+                await s3_service_1.S3Service.deleteFile(oldPhotoKey);
+            }
+            catch (cleanupError) {
+                console.error("Failed to cleanup old photo from S3:", cleanupError);
+            }
+        }
+        return updatedTopic;
+    }
+    catch (error) {
+        // If database update fails, clean up newly uploaded photo
+        if (photo && newPhotoUrl && newPhotoUrl !== existingTopic.photo_url) {
+            const urlParts = newPhotoUrl.split('/');
+            const newPhotoKey = `topics/${urlParts[urlParts.length - 1]}`;
+            try {
+                await s3_service_1.S3Service.deleteFile(newPhotoKey);
+            }
+            catch (cleanupError) {
+                console.error("Failed to cleanup new photo after database error:", cleanupError);
+            }
+        }
+        throw new Error("Failed to update topic");
+    }
 };
 exports.updateTopicService = updateTopicService;
-const deleteTopicService = async ({ id }) => {
+const deleteTopicService = async ({ topicSlug }) => {
     const topic = await prisma_1.default.topic.findUnique({
-        where: { id },
+        where: { slug: topicSlug },
     });
     if (!topic) {
         throw new Error("Topic not found");
     }
     const classCount = await prisma_1.default.class.count({
-        where: { topic_id: id },
+        where: { topic_id: topic.id },
     });
     if (classCount > 0) {
         throw new Error("Cannot delete topic with existing classes");
     }
     const questionCount = await prisma_1.default.question.count({
-        where: { topic_id: id },
+        where: { topic_id: topic.id },
     });
     if (questionCount > 0) {
         throw new Error("Cannot delete topic with existing questions");
     }
+    // Delete topic from database
     await prisma_1.default.topic.delete({
-        where: { id },
+        where: { id: topic.id },
     });
+    // Clean up photo from S3 if it exists
+    if (topic.photo_url) {
+        try {
+            const urlParts = topic.photo_url.split('/');
+            const photoKey = `topics/${urlParts[urlParts.length - 1]}`;
+            await s3_service_1.S3Service.deleteFile(photoKey);
+        }
+        catch (cleanupError) {
+            console.error("Failed to cleanup photo from S3 after topic deletion:", cleanupError);
+        }
+    }
     return true;
 };
 exports.deleteTopicService = deleteTopicService;
@@ -224,6 +354,7 @@ const getTopicsWithBatchProgressService = async ({ studentId, batchId, }) => {
             id: topic.id,
             topic_name: topic.topic_name,
             slug: topic.slug,
+            photo_url: topic.photo_url,
             batchSpecificData: {
                 totalClasses: topic.classes.length,
                 totalQuestions: assignedQuestions.size,
@@ -308,6 +439,7 @@ const getTopicOverviewWithClassesSummaryService = async ({ studentId, batchId, t
         topic_name: topic.topic_name,
         slug: topic.slug,
         description: topic.description || null,
+        photo_url: topic.photo_url || null,
         classes: classesSummary,
         overallProgress: {
             totalClasses: classesSummary.length,

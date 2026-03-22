@@ -29,12 +29,11 @@ const saveOTP = async (email, otp) => {
         where: { email },
         data: { is_used: true }
     });
-    // Save new OTP
-    const otpHash = (0, exports.generateOTPHash)(otp);
+    // Save new OTP (store plain OTP since it's only valid for 10 minutes)
     await prisma_1.default.passwordResetOTP.create({
         data: {
             email,
-            otp: otpHash,
+            otp: otp, // Store plain OTP (6 digits)
             expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
         }
     });
@@ -57,7 +56,8 @@ const validateOTP = async (email, inputOTP) => {
     if (!otpRecord) {
         return false;
     }
-    const isValid = (0, exports.verifyOTP)(inputOTP, otpRecord.otp);
+    // Compare plain OTPs (since we're storing plain OTP now)
+    const isValid = inputOTP === otpRecord.otp;
     if (isValid) {
         // Mark OTP as used
         await prisma_1.default.passwordResetOTP.update({

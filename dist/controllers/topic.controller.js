@@ -8,8 +8,13 @@ const prisma_1 = __importDefault(require("../config/prisma"));
 const topic_service_1 = require("../services/topic.service");
 const createTopic = async (req, res) => {
     try {
-        const { topic_name } = req.body;
-        const topic = await (0, topic_service_1.createTopicService)({ topic_name });
+        console.log("Create Topic req.body:", req.body);
+        const topic_name = req.body?.topic_name;
+        const photo = req.file;
+        if (!topic_name) {
+            return res.status(400).json({ message: "Topic name required" });
+        }
+        const topic = await (0, topic_service_1.createTopicService)({ topic_name, photo });
         return res.status(201).json({
             message: "Topic created successfully",
             topic,
@@ -38,10 +43,11 @@ exports.getAllTopics = getAllTopics;
 const getTopicsForBatch = async (req, res) => {
     try {
         const batch = req.batch;
-        const topics = await (0, topic_service_1.getTopicsForBatchService)({
+        const data = await (0, topic_service_1.getTopicsForBatchService)({
             batchId: batch.id,
+            query: req.query
         });
-        return res.json(topics);
+        return res.json(data);
     }
     catch (error) {
         return res.status(500).json({
@@ -52,11 +58,19 @@ const getTopicsForBatch = async (req, res) => {
 exports.getTopicsForBatch = getTopicsForBatch;
 const updateTopic = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { topic_name } = req.body;
+        console.log("Update Topic req.body:", req.body);
+        const topicSlug = req.params.topicSlug;
+        const topic_name = req.body?.topic_name;
+        const removePhoto = req.body?.removePhoto;
+        const photo = req.file;
+        if (!topic_name) {
+            return res.status(400).json({ message: "Topic name required" });
+        }
         const topic = await (0, topic_service_1.updateTopicService)({
-            id: Number(id),
+            topicSlug,
             topic_name,
+            photo,
+            removePhoto: removePhoto === 'true' || removePhoto === true,
         });
         return res.json({
             message: "Topic updated successfully",
@@ -72,9 +86,9 @@ const updateTopic = async (req, res) => {
 exports.updateTopic = updateTopic;
 const deleteTopic = async (req, res) => {
     try {
-        const { id } = req.params;
+        const topicSlug = req.params.topicSlug;
         await (0, topic_service_1.deleteTopicService)({
-            id: Number(id),
+            topicSlug,
         });
         return res.json({
             message: "Topic deleted successfully",

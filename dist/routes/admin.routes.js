@@ -10,6 +10,7 @@ const batch_controller_1 = require("../controllers/batch.controller");
 const topic_controller_1 = require("../controllers/topic.controller");
 const question_controller_1 = require("../controllers/question.controller");
 const questionBulk_controller_1 = require("../controllers/questionBulk.controller");
+const imageUpload_middleware_1 = require("../middlewares/imageUpload.middleware");
 const upload_middleware_1 = require("../middlewares/upload.middleware");
 const admin_controller_1 = require("../controllers/admin.controller");
 const csv_controller_1 = require("../controllers/csv.controller");
@@ -40,9 +41,10 @@ router.get("/cities", city_controller_1.getAllCities);
 router.get("/batches", batch_controller_1.getAllBatches);
 // Global Topics
 router.get("/topics", topic_controller_1.getAllTopics);
-router.post("/topics", role_middleware_1.isTeacherOrAbove, topic_controller_1.createTopic);
-router.patch("/topics/:id", role_middleware_1.isTeacherOrAbove, topic_controller_1.updateTopic);
-router.delete("/topics/:id", role_middleware_1.isTeacherOrAbove, topic_controller_1.deleteTopic);
+router.post("/topics", role_middleware_1.isTeacherOrAbove, imageUpload_middleware_1.uploadImage.single('photo'), topic_controller_1.createTopic);
+router.put("/topics/:topicSlug", role_middleware_1.isTeacherOrAbove, imageUpload_middleware_1.uploadImage.single('photo'), topic_controller_1.updateTopic);
+router.patch("/topics/:topicSlug", role_middleware_1.isTeacherOrAbove, imageUpload_middleware_1.uploadImage.single('photo'), topic_controller_1.updateTopic);
+router.delete("/topics/:topicSlug", role_middleware_1.isTeacherOrAbove, topic_controller_1.deleteTopic);
 //  WORKSPACE ROUTES (BATCH CONTEXT)
 // questions gloabal 
 router.post("/questions", role_middleware_1.isTeacherOrAbove, question_controller_1.createQuestion);
@@ -52,46 +54,11 @@ router.delete("/questions/:id", role_middleware_1.isTeacherOrAbove, question_con
 router.post("/questions/bulk-upload", role_middleware_1.isTeacherOrAbove, upload_middleware_1.upload.single("file"), questionBulk_controller_1.bulkUploadQuestions);
 // Admin Statistics
 router.post("/stats", admin_controller_1.getAdminStats);
+// Roles
+router.get("/roles", admin_controller_1.getRolesController);
 // Download Batch Report
 router.post("/student/reportdownload", csv_controller_1.downloadBatchReportController);
 router.post("/leaderboard", auth_middleware_1.verifyToken, role_middleware_1.isAdmin, leaderboard_controller_1.getAdminLeaderboard); // Single admin leaderboard with pagination and search
-// router.post("/leaderboard/recalculate", recalculateLeaderboard);
-// 🚨 Emergency: Restore leaderboard data after migration
-// router.post("/leaderboard/restore", async (req, res) => {
-//   try {
-//     console.log("🔄 Restoring leaderboard data...");
-//     // Get all students
-//     const students = await prisma.student.findMany({ select: { id: true } });
-//     // Create leaderboard entries for each student
-//     let created = 0;
-//     for (const student of students) {
-//       const existing = await (prisma as any).leaderboard.findUnique({
-//         where: { student_id: student.id }
-//       });
-//       if (!existing) {
-//         await (prisma as any).leaderboard.create({
-//           data: {
-//             student_id: student.id,
-//             max_streak: 0,
-//             easy_count: 0,
-//             medium_count: 0,
-//             hard_count: 0,
-//             total_solved: 0
-//           }
-//         });
-//         created++;
-//       }
-//     }
-//     res.json({ 
-//       success: true, 
-//       message: `Restored ${created} leaderboard entries`,
-//       totalStudents: students.length 
-//     });
-//   } catch (error) {
-//     console.error("Restore failed:", error);
-//     res.status(500).json({ success: false, error: (error as any).message });
-//   }
-// });
 router.get("/questions", question_controller_1.getAssignedQuestionsController);
 router.patch("/students/:id", role_middleware_1.isTeacherOrAbove, role_middleware_1.isAdmin, student_controller_1.updateStudentDetails);
 // Delete (Hard Delete)

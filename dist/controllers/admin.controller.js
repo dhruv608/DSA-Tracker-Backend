@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAdminController = exports.updateAdminController = exports.getAllAdminsController = exports.createAdminController = exports.getAdminStats = void 0;
+exports.getRolesController = exports.deleteAdminController = exports.updateAdminController = exports.getAllAdminsController = exports.createAdminController = exports.getAdminStats = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
+const client_1 = require("@prisma/client");
 const admin_service_1 = require("../services/admin.service");
 const getAdminStats = async (req, res) => {
     try {
@@ -143,6 +144,10 @@ exports.createAdminController = createAdminController;
 const getAllAdminsController = async (req, res) => {
     try {
         const filters = req.query;
+        // Default to TEACHER role if no role filter is provided (SuperAdmin context)
+        if (!filters.role) {
+            filters.role = 'TEACHER';
+        }
         const admins = await (0, admin_service_1.getAllAdminsService)(filters);
         return res.status(200).json({
             success: true,
@@ -210,3 +215,20 @@ const deleteAdminController = async (req, res) => {
     }
 };
 exports.deleteAdminController = deleteAdminController;
+const getRolesController = async (req, res) => {
+    try {
+        const roles = Object.values(client_1.AdminRole);
+        return res.status(200).json({
+            success: true,
+            data: roles
+        });
+    }
+    catch (error) {
+        console.error("Get roles error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch roles"
+        });
+    }
+};
+exports.getRolesController = getRolesController;

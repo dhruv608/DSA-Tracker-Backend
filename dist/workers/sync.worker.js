@@ -32,7 +32,7 @@ async function runStudentSyncWorker() {
     const BATCH_SIZE = 5;
     for (let i = 0; i < students.length; i += BATCH_SIZE) {
         const batch = students.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(student => (0, progressSync_service_1.syncOneStudent)(student.id, false).catch(err => {
+        await Promise.all(batch.map(student => (0, progressSync_service_1.syncOneStudent)(student.id).catch(err => {
             console.error(`❌ Failed syncing student ${student.id}`, err);
         })));
         console.log(`Processed ${Math.min(i + BATCH_SIZE, students.length)} students`);

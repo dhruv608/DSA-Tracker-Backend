@@ -37,7 +37,7 @@ export async function runStudentSyncWorker() {
 
     await Promise.all(
       batch.map(student =>
-        syncOneStudent(student.id, false).catch(err => {
+        syncOneStudent(student.id).catch(err => {
           console.error(`❌ Failed syncing student ${student.id}`, err);
         })
       )
