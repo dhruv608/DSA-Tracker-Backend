@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
+import { AdminRole } from "@prisma/client";
 import { getCityWiseStats } from "../services/admin.service";
 import { createAdminService, getAllAdminsService, updateAdminService, deleteAdminService } from "../services/admin.service";
 import { syncOneStudent } from "../services/progressSync.service";
@@ -233,6 +234,22 @@ export const deleteAdminController = async (req: Request, res: Response) => {
         return res.status(statusCode).json({
             success: false,
             message: error.message || "Failed to delete admin"
+        });
+    }
+};
+
+export const getRolesController = async (req: Request, res: Response) => {
+    try {
+        const roles = Object.values(AdminRole);
+        return res.status(200).json({
+            success: true,
+            data: roles
+        });
+    } catch (error) {
+        console.error("Get roles error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch roles"
         });
     }
 };

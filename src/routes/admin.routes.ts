@@ -10,7 +10,7 @@ import { createQuestion, deleteQuestion, getAllQuestions, getAssignedQuestionsCo
 import { bulkUploadQuestions } from "../controllers/questionBulk.controller";
 import { uploadImage } from "../middlewares/imageUpload.middleware";
 import { upload } from "../middlewares/upload.middleware";
-import { getAdminStats } from "../controllers/admin.controller";
+import { getAdminStats, getRolesController } from "../controllers/admin.controller";
 import { downloadBatchReportController } from "../controllers/csv.controller";
 import { getAdminLeaderboard } from "../controllers/leaderboard.controller";
 import { assignQuestionsToClass, getAssignedQuestionsOfClass, removeQuestionFromClass } from "../controllers/questionVisibility.controller";
@@ -80,6 +80,9 @@ router.post(
 
 // Admin Statistics
 router.post("/stats", getAdminStats);
+
+// Roles
+router.get("/roles", getRolesController);
 
 // Download Batch Report
 router.post("/student/reportdownload", downloadBatchReportController);
