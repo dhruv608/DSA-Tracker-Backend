@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "update-batch-counts": "tsx scripts/update-batch-question-counts.ts"
+    "update-batch-counts": "tsx scripts/update-batch-question-counts.ts",
+    "regenerate-class-slugs": "tsx scripts/regenerate-class-slugs.ts"
   },
   "repository": {
     "type": "git",

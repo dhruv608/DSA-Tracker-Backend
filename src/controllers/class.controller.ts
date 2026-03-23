@@ -19,7 +19,7 @@ export const getClassesByTopic = async (
 
     const classes = await getClassesByTopicService({
       batchId: batch.id,
-      topicSlug: topicSlugParam, // now guaranteed string
+      topicSlug: topicSlugParam, // string
     });
 
     return res.json(classes);
@@ -64,17 +64,19 @@ export const createClassInTopic = async (
       class_date,
     });
 
+    
     return res.status(201).json({
       message: "Class created successfully",
       class: newClass,
     });
-
+  
   } catch (error: any) {
     return res.status(400).json({
       error: error.message,
     });
   }
 };
+
 
 export const getClassDetails = async (
   req: Request,

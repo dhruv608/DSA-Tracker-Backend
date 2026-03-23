@@ -67,7 +67,7 @@ export const createTopicService = async ({
         console.error("Failed to cleanup photo after database error:", cleanupError);
       }
     }
-    
+
     if (error.code === "P2002") {
       throw new Error("Topic already exists");
     }
@@ -126,6 +126,13 @@ export const getTopicsForBatchService = async ({
         uniqueQuestions.add(qv.question.id);
       });
     });
+    const latestClassDate = topic.classes.length > 0
+      ? new Date(Math.max(...topic.classes.map(cls => new Date(cls.created_at).getTime())))
+      : new Date(0);
+
+    const firstClassDate = topic.classes.length > 0
+      ? new Date(Math.min(...topic.classes.map(cls => new Date(cls.created_at).getTime())))
+      : null; // Fallback to topic creation if no classes
 
     return {
       id: topic.id,
@@ -134,27 +141,30 @@ export const getTopicsForBatchService = async ({
       photo_url: topic.photo_url,
       classCount: topic.classes.length,
       questionCount: uniqueQuestions.size,
-      created_at: topic.created_at
+      firstClassCreated_at: firstClassDate, // Changed: First class creation date
+      latestClassDate: latestClassDate
     };
   });
 
   // Apply Search
   if (query.search) {
-     const st = query.search.toLowerCase();
-     formatted = formatted.filter(t => t.topic_name.toLowerCase().includes(st) || t.slug.includes(st));
+    const st = query.search.toLowerCase();
+    formatted = formatted.filter(t => t.topic_name.toLowerCase().includes(st) || t.slug.includes(st));
   }
 
   // Apply Sorting
   // classes, questions, recent, oldest
   if (query.sortBy === 'classes') {
-     formatted.sort((a, b) => b.classCount - a.classCount);
+    formatted.sort((a, b) => b.classCount - a.classCount);
   } else if (query.sortBy === 'questions') {
-     formatted.sort((a, b) => b.questionCount - a.questionCount);
-  } else if (query.sortBy === 'oldest') {
-     formatted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    formatted.sort((a, b) => b.questionCount - a.questionCount);
+  }
+  else if (query.sortBy === 'oldest') {
+    // Sort by oldest class creation date
+    formatted.sort((a, b) => a.latestClassDate.getTime() - b.latestClassDate.getTime());
   } else {
-     // Default: recent
-     formatted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // Default: recent - Sort by latest class creation date
+    formatted.sort((a, b) => b.latestClassDate.getTime() - a.latestClassDate.getTime());
   }
 
   // Apply Pagination
@@ -162,21 +172,21 @@ export const getTopicsForBatchService = async ({
   let limit = Number(query.limit) || 12;
   const totalCount = formatted.length;
   const totalPages = Math.ceil(totalCount / limit);
-  
+
   if (page < 1) page = 1;
-  
+
   const paginated = formatted.slice((page - 1) * limit, page * limit);
 
   return {
-      topics: paginated,
-      pagination: {
-         page,
-         limit,
-         total: totalCount,
-         totalPages,
-         hasNextPage: page < totalPages,
-         hasPreviousPage: page > 1
-      }
+    topics: paginated,
+    pagination: {
+      page,
+      limit,
+      total: totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1
+    }
   };
 };
 
@@ -221,7 +231,7 @@ export const updateTopicService = async ({
     try {
       const uploadResult = await S3Service.uploadFile(photo, 'topics');
       newPhotoUrl = uploadResult.url;
-      
+
       // If we had an old photo, mark its key for deletion
       if (existingTopic.photo_url) {
         const urlParts = existingTopic.photo_url.split('/');
@@ -295,7 +305,7 @@ export const updateTopicService = async ({
         console.error("Failed to cleanup new photo after database error:", cleanupError);
       }
     }
-    
+
     throw new Error("Failed to update topic");
   }
 };
@@ -358,7 +368,7 @@ export const getTopicsWithBatchProgressService = async ({
   studentId,
   batchId,
 }: GetTopicsWithBatchProgressInput) => {
-  
+
   // Get all topics with batch-specific classes and question counts
   const topics = await prisma.topic.findMany({
     include: {
@@ -422,7 +432,7 @@ export const getTopicsWithBatchProgressService = async ({
   const formattedTopics = topics.map((topic: any) => {
     // Count unique questions assigned to this batch for this topic
     const assignedQuestions = new Set<number>();
-    
+
     topic.classes.forEach((cls: any) => {
       cls.questionVisibility.forEach((qv: any) => {
         // Only count questions that belong to this topic
@@ -463,7 +473,7 @@ export const getTopicOverviewWithClassesSummaryService = async ({
   batchId,
   topicSlug,
 }: GetTopicOverviewWithClassesSummaryInput) => {
-  
+
   // Get topic with batch-specific classes
   const topic = await prisma.topic.findFirst({
     where: { slug: topicSlug },
@@ -524,9 +534,9 @@ export const getTopicOverviewWithClassesSummaryService = async ({
   const classesSummary = topic.classes.map((cls: any) => {
     // Count total questions for this class
     const totalQuestions = cls.questionVisibility.length;
-    
+
     // Count solved questions for this class
-    const solvedQuestions = cls.questionVisibility.filter((qv: any) => 
+    const solvedQuestions = cls.questionVisibility.filter((qv: any) =>
       solvedQuestionIds.has(qv.question.id)
     ).length;
 
