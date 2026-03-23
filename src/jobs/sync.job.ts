@@ -6,7 +6,7 @@ export function startSyncJob() {
 
   console.log("Sync cron job started");
   
-  // 🚀 Combined sync job: Student Progress FIRST, then Leaderboard
+  //  Combined sync job: Student Progress FIRST, then Leaderboard
   cron.schedule("0 */4 * * *", async () => {
   // cron.schedule("* * * * *", async () => {
 
