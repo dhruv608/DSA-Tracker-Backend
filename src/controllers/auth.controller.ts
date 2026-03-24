@@ -457,19 +457,18 @@ export const googleLogin = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "ID token required" });
     }
 
-    // Verify token with Google
+    // Verify token with Google using official google-auth-library
     async function verifyIdToken(idToken: string) {
       try {
-        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-        const tokenInfo: any = await response.json();
-
-        if (tokenInfo.error) {
-          throw new Error(tokenInfo.error);
-        }
-
-        return tokenInfo;
-      } catch (error) {
-        throw new Error('Failed to verify Google token');
+        const ticket = await googleClient.verifyIdToken({
+          idToken: idToken,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        return payload;
+      } catch (error: any) {
+        console.error("Google Auth Library verifyIdToken Error:", error.message);
+        throw new Error('Failed to verify Google token: ' + error.message);
       }
     }
 
@@ -720,7 +719,14 @@ export const resetPassword = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
+    // ADD THIS: Check if new password is same as current password
+    const bcrypt = require('bcrypt');
+    const isSamePassword = await bcrypt.compare(newPassword, user.password_hash);
+    if (isSamePassword) {
+      return res.status(400).json({
+        error: 'New password cannot be the same as your current password'
+      });
+    }
     // Hash new password
     const password_hash = await hashPassword(newPassword);
 
