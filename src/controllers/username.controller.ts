@@ -1,6 +1,37 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
 
+export const checkUsernameAvailability = async (req: Request, res: Response) => {
+  try {
+    const { username } = req.query;
+
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: "Username parameter is required" });
+    }
+
+    // Trim whitespace
+    const trimmedUsername = username.trim();
+
+    // Don't check if username is too short
+    if (trimmedUsername.length < 3) {
+      return res.json({ available: false });
+    }
+
+    // Check if username already exists
+    const existingStudent = await prisma.student.findUnique({
+      where: { username: trimmedUsername },
+      select: { id: true }
+    });
+
+    res.json({ 
+      available: !existingStudent 
+    });
+  } catch (error) {
+    console.error("Error checking username availability:", error);
+    res.status(500).json({ error: "Failed to check username availability" });
+  }
+};
+
 export const updateUsername = async (req: Request, res: Response) => {
   try {
     console.log('Username update request received');
