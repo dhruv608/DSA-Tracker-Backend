@@ -116,11 +116,7 @@ router.get("/test/leetcode/:username", testLeetcode);
 router.get("/test/gfg/:username", testGfg);
 router.post("/students/sync/:id", manualSync);
 
-router.post(
-  "/bulk-operations",
-  upload.single("file"),
-  bulkStudentUploadController
-);
+
 
 // Everything below requires valid batchSlug
 router.use("/:batchSlug", resolveBatch);
