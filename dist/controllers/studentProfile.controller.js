@@ -22,11 +22,14 @@ exports.getStudentProfile = getStudentProfile;
 const getPublicStudentProfile = async (req, res) => {
     try {
         const { username } = req.params;
+        const currentUserId = req.user?.id; // From optional auth middleware
         if (!username || Array.isArray(username)) {
             return res.status(400).json({ error: "Username is required" });
         }
         const profile = await (0, studentProfile_service_1.getPublicStudentProfileService)(username);
-        res.json(profile);
+        // Add canEdit flag if current user is viewing their own profile
+        const canEdit = currentUserId && profile.student.id === currentUserId;
+        res.json({ ...profile, canEdit });
     }
     catch (error) {
         console.error("Public profile error:", error);

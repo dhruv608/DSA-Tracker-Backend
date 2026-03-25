@@ -398,18 +398,19 @@ const googleLogin = async (req, res) => {
         if (!idToken) {
             return res.status(400).json({ error: "ID token required" });
         }
-        // Verify token with Google
+        // Verify token with Google using official google-auth-library
         async function verifyIdToken(idToken) {
             try {
-                const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-                const tokenInfo = await response.json();
-                if (tokenInfo.error) {
-                    throw new Error(tokenInfo.error);
-                }
-                return tokenInfo;
+                const ticket = await googleClient.verifyIdToken({
+                    idToken: idToken,
+                    audience: process.env.GOOGLE_CLIENT_ID,
+                });
+                const payload = ticket.getPayload();
+                return payload;
             }
             catch (error) {
-                throw new Error('Failed to verify Google token');
+                console.error("Google Auth Library verifyIdToken Error:", error.message);
+                throw new Error('Failed to verify Google token: ' + error.message);
             }
         }
         const payload = await verifyIdToken(idToken);
@@ -467,6 +468,15 @@ const googleLogin = async (req, res) => {
             where: { id: student.id },
             data: { refresh_token: refreshToken },
         });
+        // For Google Auth
+        // Set refresh token in HTTP-only cookie
+        // res.cookie('refreshToken', refreshToken, {
+        //   httpOnly: true,
+        //   secure: process.env.NODE_ENV === 'production', // Only secure in production
+        //   sameSite: 'strict',
+        //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        //   path: '/'
+        // });
         res.json({
             message: "Google login successful",
             accessToken,
@@ -629,6 +639,15 @@ const resetPassword = async (req, res) => {
         }
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
+        }
+        // Check if new password is same as current password (only if user has existing password)
+        if (user.password_hash) {
+            const isSamePassword = await (0, password_util_1.comparePassword)(newPassword, user.password_hash);
+            if (isSamePassword) {
+                return res.status(400).json({
+                    error: 'New password cannot be the same as your current password'
+                });
+            }
         }
         // Hash new password
         const password_hash = await (0, password_util_1.hashPassword)(newPassword);

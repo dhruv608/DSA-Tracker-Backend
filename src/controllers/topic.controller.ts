@@ -211,5 +211,103 @@ export const getTopicOverviewWithClassesSummary = async (req: Request, res: Resp
   }
 };
 
+export const getTopicProgressByUsername = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { username } = req.params;
+    const { sortBy = 'solved' }: { sortBy?: string } = req.query;
 
+    // Find the student by username
+    const student = await prisma.student.findUnique({
+      where: { username: username as string },
+      include: {
+        batch: true
+      }
+    });
 
+    if (!student) {
+      return res.status(404).json({
+        error: "Student not found"
+      });
+    }
+
+    // Get student progress to calculate solved questions
+    const studentProgress = await prisma.studentProgress.findMany({
+      where: { student_id: student.id }
+    });
+
+    // Get all topics with their classes
+    const topics = await prisma.topic.findMany({
+      include: {
+        classes: {
+          where: {
+            batch_id: student.batch_id || undefined
+          },
+          include: {
+            questionVisibility: true
+          }
+        }
+      }
+    });
+
+    // Calculate progress for each topic
+    const topicProgress = topics.map((topic: any) => {
+      let totalAssigned = 0;
+      let totalSolved = 0;
+
+      topic.classes.forEach((cls: any) => {
+        cls.questionVisibility.forEach((qv: any) => {
+          totalAssigned += 1;
+          
+          // Check if student solved this question
+          const isSolved = studentProgress.some((sp: any) => 
+            sp.question_id === qv.question_id
+          );
+          
+          if (isSolved) {
+            totalSolved += 1;
+          }
+        });
+      });
+
+      return {
+        id: topic.id,
+        topic_name: topic.topic_name,
+        slug: topic.slug,
+        photo_url: topic.photo_url,
+        totalAssigned,
+        totalSolved
+      };
+    });
+
+    // Sort topics based on query parameter
+    const sortedTopics = topicProgress.sort((a: any, b: any) => {
+      switch (sortBy) {
+        case 'name':
+          return a.topic_name.localeCompare(b.topic_name);
+        case 'assigned':
+          return b.totalAssigned - a.totalAssigned;
+        case 'solved':
+        default:
+          return b.totalSolved - a.totalSolved;
+      }
+    });
+
+    return res.json({
+      username,
+      studentName: student.name,
+      batchName: student.batch?.batch_name || 'Unknown',
+      topics: sortedTopics,
+      totalTopics: topics.length,
+      totalAssigned: topicProgress.reduce((sum: number, topic: any) => sum + topic.totalAssigned, 0),
+      totalSolved: topicProgress.reduce((sum: number, topic: any) => sum + topic.totalSolved, 0)
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({
+      error: error.message || "Failed to fetch topic progress",
+    });
+  }
+};

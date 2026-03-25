@@ -3,10 +3,74 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRolesController = exports.deleteAdminController = exports.updateAdminController = exports.getAllAdminsController = exports.createAdminController = exports.getAdminStats = void 0;
+exports.getRolesController = exports.deleteAdminController = exports.updateAdminController = exports.getAllAdminsController = exports.createAdminController = exports.getAdminStats = exports.getCurrentAdminController = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const client_1 = require("@prisma/client");
 const admin_service_1 = require("../services/admin.service");
+const getCurrentAdminController = async (req, res) => {
+    try {
+        // Get admin info from middleware (extracted from token)
+        const adminInfo = req.admin;
+        if (!adminInfo) {
+            return res.status(401).json({
+                success: false,
+                message: "Admin not authenticated"
+            });
+        }
+        // Get full admin details from database
+        const admin = await prisma_1.default.admin.findUnique({
+            where: { id: adminInfo.id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                city_id: true,
+                batch_id: true,
+                city: {
+                    select: {
+                        id: true,
+                        city_name: true
+                    }
+                },
+                batch: {
+                    select: {
+                        id: true,
+                        batch_name: true,
+                        year: true
+                    }
+                }
+            }
+        });
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found"
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: admin.id,
+                name: admin.name,
+                email: admin.email,
+                role: admin.role,
+                cityId: admin.city_id,
+                batchId: admin.batch_id,
+                city: admin.city,
+                batch: admin.batch
+            }
+        });
+    }
+    catch (error) {
+        console.error("Get current admin error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error instanceof Error ? error.message : "Failed to fetch current admin"
+        });
+    }
+};
+exports.getCurrentAdminController = getCurrentAdminController;
 const getAdminStats = async (req, res) => {
     try {
         const { batch_id } = req.body;

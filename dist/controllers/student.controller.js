@@ -1,9 +1,56 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addStudentProgressController = exports.createStudentController = exports.getStudentReportController = exports.getAllStudentsController = exports.deleteStudentDetails = exports.updateStudentDetails = void 0;
+exports.addStudentProgressController = exports.createStudentController = exports.getStudentReportController = exports.getAllStudentsController = exports.deleteStudentDetails = exports.updateStudentDetails = exports.getCurrentStudent = void 0;
 const student_service_1 = require("../services/student.service");
 const student_service_2 = require("../services/student.service");
 const student_service_3 = require("../services/student.service");
+const prisma_1 = __importDefault(require("../config/prisma"));
+const getCurrentStudent = async (req, res) => {
+    try {
+        const studentId = req.user?.id;
+        if (!studentId) {
+            return res.status(401).json({ success: false, message: "Student not authenticated" });
+        }
+        const student = await prisma_1.default.student.findUnique({
+            where: { id: studentId },
+            select: {
+                id: true,
+                name: true,
+                username: true,
+                email: true,
+                profile_image_url: true,
+                leetcode_id: true,
+                gfg_id: true
+            }
+        });
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: student.id,
+                name: student.name,
+                username: student.username,
+                email: student.email,
+                profileImageUrl: student.profile_image_url,
+                leetcode: student.leetcode_id,
+                gfg: student.gfg_id
+            }
+        });
+    }
+    catch (error) {
+        console.error("Get current student error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error instanceof Error ? error.message : "Failed to fetch current student"
+        });
+    }
+};
+exports.getCurrentStudent = getCurrentStudent;
 const updateStudentDetails = async (req, res) => {
     try {
         const { id } = req.params;

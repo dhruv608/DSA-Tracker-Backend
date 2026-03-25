@@ -4,44 +4,39 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTopicOverviewWithClassesSummaryService = exports.getTopicsWithBatchProgressService = exports.deleteTopicService = exports.updateTopicService = exports.getTopicsForBatchService = exports.getAllTopicsService = exports.createTopicService = void 0;
-const slugify_1 = __importDefault(require("slugify"));
 const prisma_1 = __importDefault(require("../config/prisma"));
-const s3_service_1 = require("./s3.service");
-const createTopicService = async ({ topic_name, photo, }) => {
-    if (!topic_name) {
-        throw new Error("Topic name is required");
-    }
-    const baseSlug = (0, slugify_1.default)(topic_name, {
-        lower: true,
-        strict: true,
-    });
-    let finalSlug = baseSlug;
-    let counter = 1;
-    // Ensure global unique slug
-    while (await prisma_1.default.topic.findUnique({
-        where: { slug: finalSlug },
-    })) {
-        finalSlug = `${baseSlug}-${counter++}`;
-    }
-    let photo_url = null;
+const transliteration_1 = require("transliteration");
+const s3_service_1 = require("../services/s3.service");
+const createTopicService = async ({ topic_name, photo }) => {
     let photoKey = null;
-    // Upload photo to S3 if provided
+    let photoUrl = null;
+    // Handle photo upload if provided
     if (photo) {
         try {
             const uploadResult = await s3_service_1.S3Service.uploadFile(photo, 'topics');
-            photo_url = uploadResult.url;
+            photoUrl = uploadResult.url;
             photoKey = uploadResult.key;
         }
         catch (error) {
             throw new Error("Failed to upload photo to S3");
         }
     }
+    // Generate slug from topic name
+    const baseSlug = (0, transliteration_1.slugify)(topic_name).toLowerCase();
+    let finalSlug = baseSlug;
+    let counter = 1;
+    // Check for existing slug and generate unique one if needed
+    while (await prisma_1.default.topic.findFirst({
+        where: { slug: finalSlug },
+    })) {
+        finalSlug = `${baseSlug}-${counter++}`;
+    }
     try {
         const topic = await prisma_1.default.topic.create({
             data: {
                 topic_name,
                 slug: finalSlug,
-                photo_url,
+                photo_url: photoUrl,
             },
         });
         return topic;
@@ -70,8 +65,52 @@ const getAllTopicsService = async () => {
     return topics;
 };
 exports.getAllTopicsService = getAllTopicsService;
-const getTopicsForBatchService = async ({ batchId, query = {} }) => {
-    const topics = await prisma_1.default.topic.findMany({
+const getTopicsForBatchService = async ({ batchId, query }) => {
+    const batch = await prisma_1.default.batch.findUnique({
+        where: { id: batchId },
+        include: {
+            classes: {
+                where: { batch_id: batchId },
+                include: {
+                    topic: true,
+                    questionVisibility: {
+                        include: {
+                            question: {
+                                select: {
+                                    id: true,
+                                    topic_id: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (!batch) {
+        throw new Error("Batch not found");
+    }
+    // Get ALL topics for this batch (not just ones with classes)
+    const allTopics = await prisma_1.default.topic.findMany({
+        where: {
+            // Get topics that are either:
+            // 1. Assigned to this batch via classes, OR
+            // 2. Global topics not assigned to any specific batch
+            OR: [
+                {
+                    classes: {
+                        some: {
+                            batch_id: batchId
+                        }
+                    }
+                },
+                {
+                    classes: {
+                        none: {} // Global topics with no classes
+                    }
+                }
+            ]
+        },
         include: {
             classes: {
                 where: {
@@ -82,82 +121,80 @@ const getTopicsForBatchService = async ({ batchId, query = {} }) => {
                         include: {
                             question: {
                                 select: {
-                                    id: true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                                    id: true,
+                                    topic_id: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { created_at: "desc" }
     });
-    let formatted = topics.map(topic => {
-        const uniqueQuestions = new Set();
-        topic.classes.forEach(cls => {
-            cls.questionVisibility.forEach(qv => {
-                uniqueQuestions.add(qv.question.id);
-            });
-        });
-        const latestClassDate = topic.classes.length > 0
-            ? new Date(Math.max(...topic.classes.map(cls => new Date(cls.created_at).getTime())))
-            : new Date(0);
-        const firstClassDate = topic.classes.length > 0
-            ? new Date(Math.min(...topic.classes.map(cls => new Date(cls.created_at).getTime())))
-            : null; // Fallback to topic creation if no classes
-        return {
-            id: topic.id,
+    // Create topic map with class counts
+    const topicMap = new Map();
+    // Initialize all topics with 0 counts
+    allTopics.forEach(topic => {
+        topicMap.set(topic.id, {
+            id: topic.id.toString(),
             topic_name: topic.topic_name,
             slug: topic.slug,
             photo_url: topic.photo_url,
-            classCount: topic.classes.length,
-            questionCount: uniqueQuestions.size,
-            firstClassCreated_at: firstClassDate, // Changed: First class creation date
-            latestClassDate: latestClassDate
-        };
+            classCount: 0,
+            questionCount: 0,
+            firstClassCreated_at: null
+        });
     });
-    // Apply Search
-    if (query.search) {
-        const st = query.search.toLowerCase();
-        formatted = formatted.filter(t => t.topic_name.toLowerCase().includes(st) || t.slug.includes(st));
+    // Update counts for topics that have classes in this batch
+    batch.classes.forEach(cls => {
+        const topic = topicMap.get(cls.topic.id);
+        if (topic) {
+            topic.classCount = (topic.classCount || 0) + 1;
+            topic.questionCount = (topic.questionCount || 0) + cls.questionVisibility.length;
+            topic.firstClassCreated_at = cls.created_at;
+        }
+    });
+    const topics = Array.from(topicMap.values());
+    // Apply search filter if provided
+    let filteredTopics = topics;
+    if (query?.search) {
+        filteredTopics = topics.filter(topic => topic.topic_name.toLowerCase().includes(query.search.toLowerCase()));
     }
-    // Apply Sorting
-    // classes, questions, recent, oldest
-    if (query.sortBy === 'classes') {
-        formatted.sort((a, b) => b.classCount - a.classCount);
-    }
-    else if (query.sortBy === 'questions') {
-        formatted.sort((a, b) => b.questionCount - a.questionCount);
-    }
-    else if (query.sortBy === 'oldest') {
-        // Sort by oldest class creation date
-        formatted.sort((a, b) => a.latestClassDate.getTime() - b.latestClassDate.getTime());
-    }
-    else {
-        // Default: recent - Sort by latest class creation date
-        formatted.sort((a, b) => b.latestClassDate.getTime() - a.latestClassDate.getTime());
-    }
-    // Apply Pagination
-    let page = Number(query.page) || 1;
-    let limit = Number(query.limit) || 12;
-    const totalCount = formatted.length;
-    const totalPages = Math.ceil(totalCount / limit);
-    if (page < 1)
-        page = 1;
-    const paginated = formatted.slice((page - 1) * limit, page * limit);
+    // Apply sorting
+    const sortBy = query?.sortBy || 'recent';
+    filteredTopics.sort((a, b) => {
+        switch (sortBy) {
+            case 'oldest':
+                return new Date(a.firstClassCreated_at || 0).getTime() - new Date(b.firstClassCreated_at || 0).getTime();
+            case 'classes':
+                return (b.classCount || 0) - (a.classCount || 0);
+            case 'questions':
+                return (b.questionCount || 0) - (a.questionCount || 0);
+            case 'recent':
+            default:
+                return new Date(b.firstClassCreated_at || 0).getTime() - new Date(a.firstClassCreated_at || 0).getTime();
+        }
+    });
+    // Apply pagination
+    const page = parseInt(query?.page) || 1;
+    const limit = parseInt(query?.limit) || 10;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedTopics = filteredTopics.slice(startIndex, endIndex);
     return {
-        topics: paginated,
+        topics: paginatedTopics,
         pagination: {
+            total: filteredTopics.length,
+            totalPages: Math.ceil(filteredTopics.length / limit),
             page,
-            limit,
-            total: totalCount,
-            totalPages,
-            hasNextPage: page < totalPages,
-            hasPreviousPage: page > 1
+            limit
         }
     };
 };
 exports.getTopicsForBatchService = getTopicsForBatchService;
-const updateTopicService = async ({ topicSlug, topic_name, photo, removePhoto, }) => {
+const updateTopicService = async ({ topicSlug, topic_name, photo, removePhoto }) => {
+    // Find existing topic
     const existingTopic = await prisma_1.default.topic.findUnique({
         where: { slug: topicSlug },
     });
@@ -200,10 +237,7 @@ const updateTopicService = async ({ topicSlug, topic_name, photo, removePhoto, }
         if (duplicate && duplicate.id !== existingTopic.id) {
             throw new Error("Topic already exists");
         }
-        const baseSlug = (0, slugify_1.default)(topic_name, {
-            lower: true,
-            strict: true,
-        });
+        const baseSlug = (0, transliteration_1.slugify)(topic_name).toLowerCase();
         finalSlug = baseSlug;
         let counter = 1;
         while (await prisma_1.default.topic.findFirst({
@@ -358,17 +392,41 @@ const getTopicsWithBatchProgressService = async ({ studentId, batchId, }) => {
         });
         // Get solved questions for this topic
         const solvedQuestions = solvedByTopic.get(topic.id) || new Set();
+        // Find earliest class creation date, or null if no classes
+        const firstClass = topic.classes.length > 0
+            ? topic.classes.reduce((earliest, cls) => {
+                return !earliest || cls.created_at < earliest.created_at ? cls : earliest;
+            }, null)
+            : null;
         return {
             id: topic.id,
             topic_name: topic.topic_name,
             slug: topic.slug,
             photo_url: topic.photo_url,
+            firstClassCreatedAt: firstClass?.created_at || null,
             batchSpecificData: {
                 totalClasses: topic.classes.length,
                 totalQuestions: assignedQuestions.size,
                 solvedQuestions: solvedQuestions.size
             }
         };
+    });
+    // Sort by firstClassCreatedAt (newest first), topics without classes go to end
+    formattedTopics.sort((a, b) => {
+        // Both have classes - sort by date (newest first)
+        if (a.firstClassCreatedAt && b.firstClassCreatedAt) {
+            return new Date(b.firstClassCreatedAt).getTime() - new Date(a.firstClassCreatedAt).getTime();
+        }
+        // Only A has classes - A comes first
+        if (a.firstClassCreatedAt && !b.firstClassCreatedAt) {
+            return -1;
+        }
+        // Only B has classes - B comes first  
+        if (!a.firstClassCreatedAt && b.firstClassCreatedAt) {
+            return 1;
+        }
+        // Neither has classes - keep original order
+        return 0;
     });
     return formattedTopics;
 };

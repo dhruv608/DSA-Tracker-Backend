@@ -76,7 +76,9 @@ const getStudentProfileService = async (studentId) => {
                 email: student.email,
                 enrollmentId: student.enrollment_id,
                 city: student.city?.city_name || null,
+                cityId: student.city?.id || null,
                 batch: student.batch?.batch_name || null,
+                batchId: student.batch?.id || null,
                 year: student.batch?.year || null,
                 github: student.github,
                 linkedin: student.linkedin,
@@ -186,6 +188,7 @@ const getPublicStudentProfileService = async (username) => {
     const leaderboard = student.leaderboards;
     return {
         student: {
+            id: student.id,
             name: student.name,
             username: student.username,
             city: student.city?.city_name || null,

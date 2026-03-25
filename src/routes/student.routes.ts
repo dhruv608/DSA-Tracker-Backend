@@ -14,6 +14,7 @@ import { uploadProfileImage, deleteProfileImage, getProfileImage } from '../cont
 import { getAllBatches } from "../controllers/batch.controller";
 import { getAllCities } from "../controllers/city.controller";
 import { completeProfile } from "../controllers/profile.controller";
+import { updateUsername } from "../controllers/username.controller";
 
 const router = Router();
 
@@ -51,5 +52,14 @@ router.delete("/profile-image", deleteProfileImage);              // Delete prof
 router.get("/profile-image", getProfileImage); // Get profile image URL
 
 router.put("/profile", completeProfile); // Update student profile (leetcode, gfg, etc)
+router.patch("/username", updateUsername); // Update username only
+router.get("/debug-auth", (req, res) => {
+  res.json({
+    message: "Auth debug",
+    user: req.user,
+    studentId: (req as any).studentId,
+    headers: req.headers
+  });
+}); // Debug authentication
 
 export default router;

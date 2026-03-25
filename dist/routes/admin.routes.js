@@ -32,6 +32,8 @@ const router = (0, express_1.Router)();
 router.use(auth_middleware_1.verifyToken);
 router.use(role_middleware_1.isAdmin);
 router.use(admin_middleware_1.extractAdminInfo); // Add admin info extraction
+// Current Admin Info
+router.get("/me", admin_controller_1.getCurrentAdminController);
 /* ==========================================
    GLOBAL ROUTES (NO BATCH CONTEXT)
 ========================================== */

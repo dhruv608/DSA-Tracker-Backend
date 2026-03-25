@@ -100,28 +100,73 @@ export const getTopicsForBatchService = async ({ batchId, query }: GetTopicsForB
     throw new Error("Batch not found");
   }
 
-  // Extract unique topics from classes and format them
+  // Get ALL topics for this batch (not just ones with classes)
+  const allTopics = await prisma.topic.findMany({
+    where: {
+      // Get topics that are either:
+      // 1. Assigned to this batch via classes, OR
+      // 2. Global topics not assigned to any specific batch
+      OR: [
+        {
+          classes: {
+            some: {
+              batch_id: batchId
+            }
+          }
+        },
+        {
+          classes: {
+            none: {}  // Global topics with no classes
+          }
+        }
+      ]
+    },
+    include: {
+      classes: {
+        where: {
+          batch_id: batchId
+        },
+        include: {
+          questionVisibility: {
+            include: {
+              question: {
+                select: {
+                  id: true,
+                  topic_id: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { created_at: "desc" }
+  });
+
+  // Create topic map with class counts
   const topicMap = new Map();
   
+  // Initialize all topics with 0 counts
+  allTopics.forEach(topic => {
+    topicMap.set(topic.id, {
+      id: topic.id.toString(),
+      topic_name: topic.topic_name,
+      slug: topic.slug,
+      photo_url: topic.photo_url,
+      classCount: 0,
+      questionCount: 0,
+      firstClassCreated_at: null
+    });
+  });
+  
+  // Update counts for topics that have classes in this batch
   batch.classes.forEach(cls => {
-    if (!topicMap.has(cls.topic.id)) {
-      topicMap.set(cls.topic.id, {
-        id: cls.topic.id.toString(),
-        topic_name: cls.topic.topic_name,
-        slug: cls.topic.slug,
-        photo_url: cls.topic.photo_url,
-        classCount: 0,
-        questionCount: 0,
-        firstClassCreated_at: cls.created_at
-      });
-    }
-    
-    // Update class count for this topic
     const topic = topicMap.get(cls.topic.id);
-    topic.classCount = (topic.classCount || 0) + 1;
-    
-    // Count questions for this class
-    topic.questionCount = (topic.questionCount || 0) + cls.questionVisibility.length;
+    if (topic) {
+      topic.classCount = (topic.classCount || 0) + 1;
+      topic.questionCount = (topic.questionCount || 0) + cls.questionVisibility.length;
+      topic.firstClassCreated_at = cls.created_at;
+    }
   });
 
   const topics = Array.from(topicMap.values());

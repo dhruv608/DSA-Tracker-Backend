@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTopicOverviewWithClassesSummary = exports.getTopicsWithBatchProgress = exports.createTopicsBulk = exports.deleteTopic = exports.updateTopic = exports.getTopicsForBatch = exports.getAllTopics = exports.createTopic = void 0;
+exports.getTopicProgressByUsername = exports.getTopicOverviewWithClassesSummary = exports.getTopicsWithBatchProgress = exports.createTopicsBulk = exports.deleteTopic = exports.updateTopic = exports.getTopicsForBatch = exports.getAllTopics = exports.createTopic = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const topic_service_1 = require("../services/topic.service");
 const createTopic = async (req, res) => {
@@ -185,3 +185,88 @@ const getTopicOverviewWithClassesSummary = async (req, res) => {
     }
 };
 exports.getTopicOverviewWithClassesSummary = getTopicOverviewWithClassesSummary;
+const getTopicProgressByUsername = async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { sortBy = 'solved' } = req.query;
+        // Find the student by username
+        const student = await prisma_1.default.student.findUnique({
+            where: { username: username },
+            include: {
+                batch: true
+            }
+        });
+        if (!student) {
+            return res.status(404).json({
+                error: "Student not found"
+            });
+        }
+        // Get student progress to calculate solved questions
+        const studentProgress = await prisma_1.default.studentProgress.findMany({
+            where: { student_id: student.id }
+        });
+        // Get all topics with their classes
+        const topics = await prisma_1.default.topic.findMany({
+            include: {
+                classes: {
+                    where: {
+                        batch_id: student.batch_id || undefined
+                    },
+                    include: {
+                        questionVisibility: true
+                    }
+                }
+            }
+        });
+        // Calculate progress for each topic
+        const topicProgress = topics.map((topic) => {
+            let totalAssigned = 0;
+            let totalSolved = 0;
+            topic.classes.forEach((cls) => {
+                cls.questionVisibility.forEach((qv) => {
+                    totalAssigned += 1;
+                    // Check if student solved this question
+                    const isSolved = studentProgress.some((sp) => sp.question_id === qv.question_id);
+                    if (isSolved) {
+                        totalSolved += 1;
+                    }
+                });
+            });
+            return {
+                id: topic.id,
+                topic_name: topic.topic_name,
+                slug: topic.slug,
+                photo_url: topic.photo_url,
+                totalAssigned,
+                totalSolved
+            };
+        });
+        // Sort topics based on query parameter
+        const sortedTopics = topicProgress.sort((a, b) => {
+            switch (sortBy) {
+                case 'name':
+                    return a.topic_name.localeCompare(b.topic_name);
+                case 'assigned':
+                    return b.totalAssigned - a.totalAssigned;
+                case 'solved':
+                default:
+                    return b.totalSolved - a.totalSolved;
+            }
+        });
+        return res.json({
+            username,
+            studentName: student.name,
+            batchName: student.batch?.batch_name || 'Unknown',
+            topics: sortedTopics,
+            totalTopics: topics.length,
+            totalAssigned: topicProgress.reduce((sum, topic) => sum + topic.totalAssigned, 0),
+            totalSolved: topicProgress.reduce((sum, topic) => sum + topic.totalSolved, 0)
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            error: error.message || "Failed to fetch topic progress",
+        });
+    }
+};
+exports.getTopicProgressByUsername = getTopicProgressByUsername;
