@@ -155,13 +155,27 @@ export const updateBatchService = async ({
     );
   }
 
+  // Detect if relevant fields changed
+  const batchNameChanged = batch_name && batch_name !== existingBatch.batch_name;
+  const yearChanged = year && year !== existingBatch.year;
+  const cityIdChanged = city_id && city_id !== existingBatch.city_id;
+  const shouldRegenerateSlug = batchNameChanged || yearChanged || cityIdChanged;
+
+  // Prepare update data
+  const updateData: any = {
+    batch_name: finalBatchName,
+    year: finalYear,
+    city_id: finalCityId,
+  };
+
+  // Regenerate slug only if relevant fields changed
+  if (shouldRegenerateSlug) {
+    updateData.slug = generateBatchSlug(city.city_name, finalBatchName, finalYear);
+  }
+
   const updatedBatch = await prisma.batch.update({
     where: { id: existingBatch.id },
-    data: {
-      batch_name: finalBatchName,
-      year: finalYear,
-      city_id: finalCityId,
-    },
+    data: updateData,
   });
 
   return updatedBatch;
