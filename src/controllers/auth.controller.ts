@@ -539,13 +539,13 @@ export const googleLogin = async (req: Request, res: Response) => {
    
     // For Google Auth
     // Set refresh token in HTTP-only cookie
-    // res.cookie('refreshToken', refreshToken, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === 'production', // Only secure in production
-    //   sameSite: 'strict',
-    //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    //   path: '/'
-    // });
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only secure in production
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/'
+    });
 
     res.json({
       message: "Google login successful",
