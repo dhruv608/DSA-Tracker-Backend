@@ -60,47 +60,9 @@ const createTopicService = async ({ topic_name, photo }) => {
 exports.createTopicService = createTopicService;
 const getAllTopicsService = async () => {
     const topics = await prisma_1.default.topic.findMany({
-        include: {
-            classes: {
-                include: {
-                    questionVisibility: {
-                        include: {
-                            question: {
-                                select: {
-                                    id: true,
-                                    topic_id: true,
-                                    question_name: true,
-                                    level: true,
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
         orderBy: { created_at: "desc" },
     });
-    // Transform topics to include counts and metadata
-    const transformedTopics = topics.map((topic) => ({
-        id: topic.id.toString(),
-        topic_name: topic.topic_name,
-        slug: topic.slug,
-        photo_url: topic.photo_url,
-        created_at: topic.created_at,
-        updated_at: topic.updated_at,
-        classCount: topic.classes.length,
-        questionCount: topic.classes.reduce((total, cls) => total + cls.questionVisibility.length, 0),
-        firstClassCreated_at: topic.classes.length > 0 ? topic.classes[0].created_at : null,
-        classes: topic.classes.map((cls) => ({
-            id: cls.id,
-            class_name: cls.class_name,
-            batch_id: cls.batch_id,
-            created_at: cls.created_at,
-            questionCount: cls.questionVisibility.length,
-            questionVisibility: cls.questionVisibility
-        }))
-    }));
-    return transformedTopics;
+    return topics;
 };
 exports.getAllTopicsService = getAllTopicsService;
 const getTopicsForBatchService = async ({ batchId, query }) => {
@@ -129,46 +91,79 @@ const getTopicsForBatchService = async ({ batchId, query }) => {
         throw new Error("Batch not found");
     }
     // Get ALL topics for this batch (not just ones with classes)
+    // const allTopics = await prisma.topic.findMany({
+    //   where: {
+    //     // Get topics that are either:
+    //     // 1. Assigned to this batch via classes, OR
+    //     // 2. Global topics not assigned to any specific batch
+    //     OR: [
+    //       {
+    //         classes: {
+    //           some: {
+    //             batch_id: batchId
+    //           }
+    //         }
+    //       },
+    //       {
+    //         classes: {
+    //           none: {}  // Global topics with no classes
+    //         }
+    //       }
+    //     ]
+    //   },
+    //   include: {
+    //     classes: {
+    //       where: {
+    //         batch_id: batchId
+    //       },
+    //       include: {
+    //         questionVisibility: {
+    //           include: {
+    //             question: {
+    //               select: {
+    //                 id: true,
+    //                 topic_id: true,
+    //               },
+    //             },
+    //           },
+    //         },
+    //       },
+    //     },
+    //   },
+    //   orderBy: { created_at: "desc" }
+    // });
     const allTopics = await prisma_1.default.topic.findMany({
-        where: {
-            // Get topics that are either:
-            // 1. Assigned to this batch via classes, OR
-            // 2. Global topics not assigned to any specific batch
-            OR: [
-                {
-                    classes: {
-                        some: {
-                            batch_id: batchId
-                        }
-                    }
-                },
-                {
-                    classes: {
-                        none: {} // Global topics with no classes
-                    }
-                }
-            ]
-        },
-        include: {
-            classes: {
-                where: {
-                    batch_id: batchId
-                },
-                include: {
-                    questionVisibility: {
-                        include: {
-                            question: {
-                                select: {
-                                    id: true,
-                                    topic_id: true,
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
         orderBy: { created_at: "desc" }
+    });
+    // Step 2: Get all classes for THIS batch
+    const batchClasses = await prisma_1.default.class.findMany({
+        where: { batch_id: batchId },
+        include: {
+            questionVisibility: true
+        }
+    });
+    // Step 3: Create map of topic -> classes/questions for THIS batch
+    const topicStats = new Map();
+    batchClasses.forEach(cls => {
+        const currentStats = topicStats.get(cls.topic_id) || { classCount: 0, questionCount: 0 };
+        currentStats.classCount += 1;
+        currentStats.questionCount += cls.questionVisibility.length;
+        topicStats.set(cls.topic_id, currentStats);
+    });
+    // Step 4: Transform all topics with stats
+    const topics = allTopics.map(topic => {
+        const stats = topicStats.get(topic.id) || { classCount: 0, questionCount: 0 };
+        return {
+            id: topic.id.toString(),
+            topic_name: topic.topic_name,
+            slug: topic.slug,
+            photo_url: topic.photo_url,
+            created_at: topic.created_at,
+            updated_at: topic.updated_at,
+            classCount: stats.classCount, // 0 for new batches
+            questionCount: stats.questionCount, // 0 for new batches
+            firstClassCreated_at: null
+        };
     });
     // Create topic map with class counts
     const topicMap = new Map();
@@ -193,7 +188,6 @@ const getTopicsForBatchService = async ({ batchId, query }) => {
             topic.firstClassCreated_at = cls.created_at;
         }
     });
-    const topics = Array.from(topicMap.values());
     // Apply search filter if provided
     let filteredTopics = topics;
     if (query?.search) {

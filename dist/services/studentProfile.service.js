@@ -70,6 +70,29 @@ const getStudentProfileService = async (studentId) => {
       GROUP BY DATE(sync_at)
       ORDER BY date DESC
     `;
+        // 4️⃣ Get today's submission count and check if questions were uploaded today
+        const today = new Date().toISOString().split('T')[0];
+        const todaySubmission = heatmap.find((h) => h.date === today);
+        const count = todaySubmission ? Number(todaySubmission.count) : 0;
+        // Check if any question was uploaded today for this student's batch + city
+        const hasQuestion = await prisma_1.default.$queryRaw `
+      SELECT EXISTS(
+        SELECT 1 
+        FROM "Question" q
+        JOIN "Topic" t ON q.topic_id = t.id
+        JOIN "Class" c ON t.id = c.topic_id
+        WHERE DATE(q.created_at) = ${today}
+        AND c.batch_id = ${student.batch_id}
+        AND (
+          ${student.city?.id} IS NULL 
+          OR EXISTS (
+            SELECT 1 FROM "City" city 
+            WHERE city.id = ${student.city?.id}
+          )
+        )
+      ) as has_question
+    `;
+        const hasQuestionResult = hasQuestion.length > 0 ? Boolean(hasQuestion[0].has_question) : false;
         return {
             student: {
                 name: student.name,
@@ -105,7 +128,9 @@ const getStudentProfileService = async (studentId) => {
             },
             streak: {
                 currentStreak: leaderboard?.current_streak || 0,
-                maxStreak: leaderboard?.max_streak || 0
+                maxStreak: leaderboard?.max_streak || 0,
+                count: count,
+                hasQuestion: hasQuestionResult
             },
             leaderboard: {
                 globalRank: leaderboard?.alltime_global_rank || 0,

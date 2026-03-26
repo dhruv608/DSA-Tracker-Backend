@@ -17,9 +17,23 @@ export const getClassesByTopic = async (
       });
     }
 
+    // Extract pagination and search parameters
+    const {
+      page = '1',
+      limit = '20',
+      search = ''
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const searchQuery = search as string;
+
     const classes = await getClassesByTopicService({
       batchId: batch.id,
-      topicSlug: topicSlugParam, // string
+      topicSlug: topicSlugParam,
+      page: pageNum,
+      limit: limitNum,
+      search: searchQuery,
     });
 
     return res.json(classes);

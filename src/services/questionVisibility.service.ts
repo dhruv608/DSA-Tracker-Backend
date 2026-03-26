@@ -49,7 +49,7 @@ export const assignQuestionsToClassService = async ({
     skipDuplicates: true,
   });
 
-  // 🔄 Update batch question counts after assignment
+  // Update batch question counts after assignment
   await updateBatchQuestionCounts(batchId);
 
   return { assignedCount: questionIds.length };
@@ -59,12 +59,18 @@ interface GetAssignedInput {
   batchId: number;
   topicSlug: string;
   classSlug: string;
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
 export const getAssignedQuestionsOfClassService = async ({
   batchId,
   topicSlug,
   classSlug,
+  page = 1,
+  limit = 25,
+  search = '',
 }: GetAssignedInput) => {
 
   // Find topic first
@@ -88,10 +94,32 @@ export const getAssignedQuestionsOfClassService = async ({
     throw new Error("Class not found in this topic and batch");
   }
 
+  // Build where clause
+  const whereClause: any = {
+    class_id: cls.id,
+  };
+
+  // Add search filter if provided
+  if (search) {
+    whereClause.question = {
+      question_name: {
+        contains: search,
+        mode: 'insensitive'
+      }
+    };
+  }
+
+  // Get total count for pagination
+  const total = await prisma.questionVisibility.count({
+    where: whereClause,
+  });
+
+  // Calculate pagination
+  const skip = (page - 1) * limit;
+  const totalPages = Math.ceil(total / limit);
+
   const assigned = await prisma.questionVisibility.findMany({
-    where: {
-      class_id: cls.id,
-    },
+    where: whereClause,
     include: {
       question: {
         include: {
@@ -104,9 +132,21 @@ export const getAssignedQuestionsOfClassService = async ({
     orderBy: {
       assigned_at: "desc",
     },
+    skip,
+    take: limit,
   });
 
-  return assigned.map((qv) => qv.question);
+  const questions = assigned.map((qv) => qv.question);
+
+  return {
+    data: questions,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  };
 };
 
 interface RemoveQuestionInput {

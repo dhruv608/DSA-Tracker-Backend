@@ -4,24 +4,50 @@ import prisma from "../config/prisma";
 interface GetClassesByTopicInput {
   batchId: number;
   topicSlug: string;
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
 export const getClassesByTopicService = async ({
   batchId,
   topicSlug,
+  page = 1,
+  limit = 20,
+  search = '',
 }: GetClassesByTopicInput) => {
 
   if (!topicSlug) {
     throw new Error("Invalid topic slug");
   }
 
-  const classes = await prisma.class.findMany({
-    where: {
-      batch_id: batchId,
-      topic: {
-        slug: topicSlug,
-      },
+  // Build where clause
+  const whereClause: any = {
+    batch_id: batchId,
+    topic: {
+      slug: topicSlug,
     },
+  };
+
+  // Add search filter if provided
+  if (search) {
+    whereClause.class_name = {
+      contains: search,
+      mode: 'insensitive'
+    };
+  }
+
+  // Get total count for pagination
+  const total = await prisma.class.count({
+    where: whereClause,
+  });
+
+  // Calculate pagination
+  const skip = (page - 1) * limit;
+  const totalPages = Math.ceil(total / limit);
+
+  const classes = await prisma.class.findMany({
+    where: whereClause,
     include: {
       topic: true, // so we can validate topic existence
       _count: {
@@ -33,10 +59,12 @@ export const getClassesByTopicService = async ({
     orderBy: {
       class_date: "asc",
     },
+    skip,
+    take: limit,
   });
 
   // If no classes found, we must check whether topic exists
-  if (classes.length === 0) {
+  if (classes.length === 0 && !search) {
     const topicExists = await prisma.topic.findUnique({
       where: { slug: topicSlug },
     });
@@ -58,7 +86,15 @@ export const getClassesByTopicService = async ({
     created_at: cls.created_at,
   }));
 
-  return formatted;
+  return {
+    data: formatted,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  };
 };
 
 interface CreateClassInput {

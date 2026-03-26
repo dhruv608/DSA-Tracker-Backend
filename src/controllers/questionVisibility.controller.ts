@@ -101,15 +101,30 @@ export const getAssignedQuestionsOfClass = async (
       });
     }
 
+    // Extract pagination and search parameters
+    const {
+      page = '1',
+      limit = '25',
+      search = ''
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const searchQuery = search as string;
+
     const assigned = await getAssignedQuestionsOfClassService({
       batchId: batch.id,
       topicSlug: topicSlugParam,
       classSlug,
+      page: pageNum,
+      limit: limitNum,
+      search: searchQuery,
     });
 
     return res.json({
       message: "Assigned questions retrieved successfully",
-      data: assigned,
+      data: assigned.data,
+      pagination: assigned.pagination,
     });
 
   } catch (error: any) {
