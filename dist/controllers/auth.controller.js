@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.forgotPassword = exports.logoutAdmin = exports.logoutStudent = exports.googleLogin = exports.refreshToken = exports.loginAdmin = exports.registerAdmin = exports.loginStudent = exports.registerStudent = void 0;
+exports.resetPassword = exports.verifyOtp = exports.forgotPassword = exports.logoutAdmin = exports.logoutStudent = exports.googleLogin = exports.refreshToken = exports.loginAdmin = exports.registerAdmin = exports.loginStudent = exports.registerStudent = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const password_util_1 = require("../utils/password.util");
 const jwt_util_1 = require("../utils/jwt.util");
@@ -11,6 +11,7 @@ const google_auth_library_1 = require("google-auth-library");
 const otp_util_1 = require("../utils/otp.util");
 const email_util_1 = require("../utils/email.util");
 const emailValidation_util_1 = require("../utils/emailValidation.util");
+const passwordValidator_util_1 = require("../utils/passwordValidator.util");
 const asyncHandler_1 = require("../utils/asyncHandler");
 const ApiError_1 = require("../utils/ApiError");
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
@@ -43,6 +44,8 @@ exports.registerStudent = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     if (!batch) {
         throw new ApiError_1.ApiError(400, 'Invalid batch_id', [], "BATCH_NOT_FOUND");
     }
+    // Validate password strength
+    (0, passwordValidator_util_1.validatePasswordForAuth)(password);
     // Hash password
     const password_hash = await (0, password_util_1.hashPassword)(password);
     // Create student
@@ -194,6 +197,8 @@ exports.registerAdmin = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     if (role !== "TEACHER" && role !== "INTERN" && role !== "SUPERADMIN") {
         throw new ApiError_1.ApiError(400, "Invalid role type");
     }
+    // Validate password strength
+    (0, passwordValidator_util_1.validatePasswordForAuth)(password);
     const password_hash = await (0, password_util_1.hashPassword)(password);
     const admin = await prisma_1.default.admin.create({
         data: {
@@ -521,6 +526,29 @@ exports.forgotPassword = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         otp: otp // Return OTP for testing
     });
 });
+// Verify OTP - Only validate OTP, don't reset password
+exports.verifyOtp = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+        throw new ApiError_1.ApiError(400, 'Email and OTP are required');
+    }
+    // Validate email domain
+    const emailValidation = (0, emailValidation_util_1.validateEmail)(email);
+    if (!emailValidation.isValid) {
+        throw new ApiError_1.ApiError(400, emailValidation.error);
+    }
+    // Verify OTP
+    console.log(`Attempting to validate OTP: ${otp} for email: ${email}`);
+    const isValidOTP = await (0, otp_util_1.validateOTP)(email, otp);
+    console.log(`OTP validation result: ${isValidOTP}`);
+    if (!isValidOTP) {
+        throw new ApiError_1.ApiError(400, 'Invalid or expired OTP');
+    }
+    res.json({
+        message: 'OTP verified successfully',
+        valid: true
+    });
+});
 // Reset Password - Verify OTP and reset password
 exports.resetPassword = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { email, otp, newPassword } = req.body;
@@ -533,9 +561,7 @@ exports.resetPassword = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
         throw new ApiError_1.ApiError(400, emailValidation.error);
     }
     // Validate password strength
-    if (newPassword.length < 6) {
-        throw new ApiError_1.ApiError(400, 'Password must be at least 6 characters long');
-    }
+    (0, passwordValidator_util_1.validatePasswordForAuth)(newPassword);
     // Verify OTP
     console.log(`Attempting to validate OTP: ${otp} for email: ${email}`);
     const isValidOTP = await (0, otp_util_1.validateOTP)(email, otp);
