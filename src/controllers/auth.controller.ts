@@ -507,7 +507,7 @@ export const googleLogin = asyncHandler(async (req: Request, res: Response) => {
     where: { id: student.id },
     data: { refresh_token: refreshToken },
   });
- 
+
   // For Google Auth
   // Set refresh token in HTTP-only cookie
   res.cookie('refreshToken', refreshToken, {
@@ -649,7 +649,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   if (!isValidOTP) {
     throw new ApiError(400, 'Invalid or expired OTP');
   }
-
+ 
   res.json({
     message: 'OTP verified successfully',
     valid: true
@@ -681,6 +681,15 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   if (!isValidOTP) {
     throw new ApiError(400, 'Invalid or expired OTP');
   }
+
+  // Mark OTP as used since password was successfully reset
+  await prisma.passwordResetOTP.updateMany({
+    where: {
+      email,
+      is_used: false
+    },
+    data: { is_used: true }
+  });
 
   // Find user and update password
   let user = null;

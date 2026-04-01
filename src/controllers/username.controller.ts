@@ -5,7 +5,7 @@ import { ApiError } from "../utils/ApiError";
 
 export const checkUsernameAvailability = asyncHandler(async (req: Request, res: Response) => {
           try {
-            const { username } = req.query;
+            const { username, userId } = req.query;
 
             if (!username || typeof username !== 'string') {
               throw new ApiError(400, "Username parameter is required");
@@ -19,9 +19,16 @@ export const checkUsernameAvailability = asyncHandler(async (req: Request, res: 
               return res.json({ available: false });
             }
 
-            // Check if username already exists
+            // Check if username already exists, excluding current user if userId provided
+            const whereClause: any = { username: trimmedUsername };
+            
+            // If userId is provided, exclude current user from the check
+            if (userId && typeof userId === 'string') {
+              whereClause.id = { not: userId };
+            }
+
             const existingStudent = await prisma.student.findUnique({
-              where: { username: trimmedUsername },
+              where: whereClause,
               select: { id: true }
             });
 
