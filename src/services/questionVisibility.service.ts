@@ -253,27 +253,48 @@ export const getAllQuestionsWithFiltersService = async ({
     }
   });
 
-  // Get student's solved questions
+  // Get student's solved questions and bookmarks
   const questionIds = Array.from(uniqueQuestions.keys());
-  const studentProgress = await prisma.studentProgress.findMany({
-    where: {
-      student_id: studentId,
-      question_id: { in: questionIds }
-    },
-    select: {
-      question_id: true,
-      sync_at: true
-    }
-  });
+  const [studentProgress, studentBookmarks] = await Promise.all([
+    // Get solved questions
+    prisma.studentProgress.findMany({
+      where: {
+        student_id: studentId,
+        question_id: { in: questionIds }
+      },
+      select: {
+        question_id: true,
+        sync_at: true
+      }
+    }),
+    // Get bookmarked questions
+    prisma.bookmark.findMany({
+      where: {
+        student_id: studentId,
+        question_id: { in: questionIds }
+      },
+      select: {
+        question_id: true
+      }
+    })
+  ]);
 
   const solvedQuestionIds = new Set(
     studentProgress.map(progress => progress.question_id)
   );
 
+  const bookmarkedQuestionIds = new Set(
+    studentBookmarks.map(bookmark => bookmark.question_id)
+  );
+
+  console.log('🔍 DEBUG - studentBookmarks:', studentBookmarks);
+  console.log('🔍 DEBUG - bookmarkedQuestionIds:', Array.from(bookmarkedQuestionIds));
+
   // Convert to array and apply filters
   let questions = Array.from(uniqueQuestions.values()).map((question: any) => ({
     ...question,
     isSolved: solvedQuestionIds.has(question.id),
+    isBookmarked: bookmarkedQuestionIds.has(question.id),
     syncAt: solvedQuestionIds.has(question.id) 
       ? studentProgress.find(p => p.question_id === question.id)?.sync_at
       : null

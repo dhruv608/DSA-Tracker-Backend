@@ -499,24 +499,44 @@ export const getClassDetailsWithFullQuestionsService = async ({
     throw new ApiError(400, "Class not found");
   }
 
-  // Get student's solved questions for this class
+  // Get student's solved questions and bookmarks for this class
   const questionIds = classData.questionVisibility.map(qv => qv.question_id);
   
-  const studentProgress = await prisma.studentProgress.findMany({
-    where: {
-      student_id: studentId,
-      question_id: { in: questionIds }
-    },
-    select: {
-      question_id: true,
-      sync_at: true
-    }
-  });
+  const [studentProgress, studentBookmarks] = await Promise.all([
+    // Get solved questions
+    prisma.studentProgress.findMany({
+      where: {
+        student_id: studentId,
+        question_id: { in: questionIds }
+      },
+      select: {
+        question_id: true,
+        sync_at: true
+      }
+    }),
+    // Get bookmarked questions
+    prisma.bookmark.findMany({
+      where: {
+        student_id: studentId,
+        question_id: { in: questionIds }
+      },
+      select: {
+        question_id: true
+      }
+    })
+  ]);
 
-  // Create a Set of solved question IDs for quick lookup
+  // Create Sets for quick lookup
   const solvedQuestionIds = new Set(
     studentProgress.map(progress => progress.question_id)
   );
+
+  const bookmarkedQuestionIds = new Set(
+    studentBookmarks.map(bookmark => bookmark.question_id)
+  );
+
+  console.log(' CLASS DEBUG - studentBookmarks:', studentBookmarks);
+  console.log(' CLASS DEBUG - bookmarkedQuestionIds:', Array.from(bookmarkedQuestionIds));
 
   // Format questions with full details and solved status
   const questionsWithProgress = classData.questionVisibility.map((qv: any) => {
@@ -530,6 +550,7 @@ export const getClassDetailsWithFullQuestionsService = async ({
       type: question.type,
       topic: question.topic,
       isSolved: solvedQuestionIds.has(question.id),
+      isBookmarked: bookmarkedQuestionIds.has(question.id),
       syncAt: solvedQuestionIds.has(question.id) 
         ? studentProgress.find(p => p.question_id === question.id)?.sync_at
         : null

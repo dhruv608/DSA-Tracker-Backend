@@ -20,7 +20,7 @@ function startSyncJob() {
             try {
                 console.log(` Starting combined sync cycle (attempt ${attempt + 1}/${maxRetries})...`);
                 // Step 1: Update student progress first
-                console.log(" Step 1: Syncing student progress...");
+                console.log("🎶🎶🎶🎶 Step 1: Syncing student progress...");
                 const studentSyncStart = Date.now();
                 await (0, sync_worker_1.runStudentSyncWorker)();
                 const studentSyncDuration = Date.now() - studentSyncStart;
@@ -30,10 +30,13 @@ function startSyncJob() {
                 const leaderboardSyncStart = Date.now();
                 const leaderboardResult = await (0, leaderboardSync_service_1.syncLeaderboardData)();
                 const leaderboardSyncDuration = Date.now() - leaderboardSyncStart;
-                console.log(` Leaderboard sync completed in ${leaderboardSyncDuration}ms`);
+                console.log(`❤️❤️❤️❤️❤️❤️❤️ Leaderboard sync completed in ${leaderboardSyncDuration}ms`);
                 const totalDuration = Date.now() - studentSyncStart;
-                console.log(` Combined sync cycle completed successfully in ${totalDuration}ms`);
-                console.log(`Processed ${leaderboardResult.studentsProcessed} students`);
+                console.log(`❤️❤️❤️❤️❤️❤️❤️ Combined sync cycle completed successfully in ${totalDuration}ms`);
+                console.log(`❤️❤️❤️❤️❤️❤️❤️ Processed ${leaderboardResult.studentsProcessed} students`);
+                // Stop server after sync completion
+                // console.log("Stopping server...");
+                // process.exit(0);
                 // Success, exit retry loop
                 break;
             }

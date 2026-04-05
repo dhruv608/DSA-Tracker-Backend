@@ -159,7 +159,7 @@ const getLeaderboardWithPagination = async (filters, pagination, search) => {
             JOIN "City" c ON c.id = s.city_id
             JOIN "Leaderboard" l ON l.student_id = s.id
             ${whereClause}
-            ORDER BY ${globalRankField}
+            ORDER BY ${city && city !== "all" ? cityRankField : globalRankField}
             LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
         const leaderboardData = await prisma_1.default.$queryRawUnsafe(leaderboardQuery, ...params);

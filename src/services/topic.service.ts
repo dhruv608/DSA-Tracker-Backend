@@ -416,11 +416,13 @@ export const deleteTopicService = async ({ topicSlug }: DeleteTopicInput) => {
 interface GetTopicsWithBatchProgressInput {
   studentId: number;
   batchId: number;
+  query?: any;
 }
 
 export const getTopicsWithBatchProgressService = async ({
   studentId,
   batchId,
+  query,
 }: GetTopicsWithBatchProgressInput) => {
   // Get all topics with batch-specific classes and question counts
   const topics = await prisma.topic.findMany({
@@ -537,7 +539,30 @@ export const getTopicsWithBatchProgressService = async ({
     return 0;
   });
 
-  return formattedTopics;
+  // Apply search filter if provided
+  let filteredTopics = formattedTopics;
+  if (query?.search) {
+    filteredTopics = formattedTopics.filter(topic =>
+      topic.topic_name.toLowerCase().includes(query.search.toLowerCase())
+    );
+  }
+
+  // Apply pagination
+  const page = parseInt(query?.page as string) || 1;
+  const limit = parseInt(query?.limit as string) || 10;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedTopics = filteredTopics.slice(startIndex, endIndex);
+
+  return {
+    topics: paginatedTopics,
+    pagination: {
+      total: filteredTopics.length,
+      totalPages: Math.ceil(filteredTopics.length / limit),
+      page,
+      limit
+    }
+  };
 };
 
 interface GetTopicOverviewWithClassesSummaryInput {

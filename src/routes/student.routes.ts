@@ -16,6 +16,7 @@ import { getAllBatches } from "../controllers/batch.controller";
 import { getAllCities } from "../controllers/city.controller";
 import { updateUsername } from "../controllers/username.controller";
 import { getRecentQuestions } from "../controllers/recentQuestions.controller";
+import { getBookmarks, addBookmark, updateBookmark, deleteBookmark } from "../controllers/bookmark.controller";
 
 const router = Router();
 
@@ -57,6 +58,10 @@ router.delete("/profile-image", deleteProfileImage);              // Delete prof
 
 router.patch("/username", updateUsername); // Update username only
 
-
+// ===== BOOKMARK ROUTES =====
+router.get("/bookmarks", getBookmarks); // Get all bookmarks with pagination and filtering
+router.post("/bookmarks", addBookmark); // Add new bookmark
+router.put("/bookmarks/:questionId", updateBookmark); // Update bookmark description
+router.delete("/bookmarks/:questionId", deleteBookmark); // Delete bookmark
 
 export default router;

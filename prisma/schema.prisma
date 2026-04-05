@@ -62,6 +62,7 @@ model Student {
   batch             Batch?            @relation(fields: [batch_id], references: [id])
   city              City?             @relation(fields: [city_id], references: [id])
   progress          StudentProgress[]
+  bookmarks         Bookmark[]
 
   @@index([city_id])
   @@index([batch_id])
@@ -110,6 +111,7 @@ model Question {
   topic         Topic                @relation(fields: [topic_id], references: [id], onDelete: Cascade)
   visibility    QuestionVisibility[]
   progress      StudentProgress[]
+  bookmarks     Bookmark[]
 
   @@index([topic_id])
   @@index([platform])
@@ -213,4 +215,20 @@ model PasswordResetOTP {
 
   @@index([email])
   @@index([expires_at])
+}
+
+model Bookmark {
+  id          Int      @id @default(autoincrement())
+  student_id  Int
+  question_id Int
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  student   Student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  question  Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  
+  @@unique([student_id, question_id])
+  @@index([student_id])
+  @@index([question_id])
 }

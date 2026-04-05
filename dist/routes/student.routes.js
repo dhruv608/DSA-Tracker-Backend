@@ -18,6 +18,7 @@ const batch_controller_1 = require("../controllers/batch.controller");
 const city_controller_1 = require("../controllers/city.controller");
 const username_controller_1 = require("../controllers/username.controller");
 const recentQuestions_controller_1 = require("../controllers/recentQuestions.controller");
+const bookmark_controller_1 = require("../controllers/bookmark.controller");
 const router = (0, express_1.Router)();
 // Public route - optional authentication for canEdit flag
 router.get("/profile/:username", optionalAuth_middleware_1.optionalAuth, studentProfile_controller_1.getPublicStudentProfile);
@@ -45,4 +46,9 @@ router.post("/leaderboard", leaderboard_controller_1.getStudentLeaderboard); // 
 router.post("/profile-image", uploadphoto_middleware_1.uploadSingle, profileImage_controller_1.uploadProfileImage); // Upload/Update profile image
 router.delete("/profile-image", profileImage_controller_1.deleteProfileImage); // Delete profile image
 router.patch("/username", username_controller_1.updateUsername); // Update username only
+// ===== BOOKMARK ROUTES =====
+router.get("/bookmarks", bookmark_controller_1.getBookmarks); // Get all bookmarks with pagination and filtering
+router.post("/bookmarks", bookmark_controller_1.addBookmark); // Add new bookmark
+router.put("/bookmarks/:questionId", bookmark_controller_1.updateBookmark); // Update bookmark description
+router.delete("/bookmarks/:questionId", bookmark_controller_1.deleteBookmark); // Delete bookmark
 exports.default = router;

@@ -14,12 +14,12 @@ const syncLeaderboardData = async () => {
         // Use transaction for atomicity
         await prisma_1.default.$transaction(async (tx) => {
             const truncateStart = Date.now();
-            // Step 1: Clear existing leaderboard
-            await tx.$executeRaw `TRUNCATE TABLE "Leaderboard"`;
-            console.log(`🧹 Cleared existing leaderboard in ${Date.now() - truncateStart}ms`);
+            // Step 1: Keep existing leaderboard data (remove TRUNCATE - use UPSERT instead)
+            console.log(`Cleared existing leaderboard in ${Date.now() - truncateStart}ms`);
             const calculationStart = Date.now();
             // Step 2: Calculate and insert new data with time-based rankings
             result = await tx.$queryRawUnsafe(`
+
       WITH student_solves_all AS (
         SELECT
           sp.student_id,
@@ -40,14 +40,6 @@ const syncLeaderboardData = async () => {
         GROUP BY sp.student_id
       ),
       
-      question_availability AS (
-        SELECT DISTINCT
-          DATE(q.created_at) as date,
-          true as has_question
-        FROM "Question" q
-        WHERE DATE(q.created_at) >= CURRENT_DATE - INTERVAL '365 days'
-      ),
-      
       final_stats AS (
         SELECT
           s.id AS student_id,
@@ -65,14 +57,6 @@ const syncLeaderboardData = async () => {
           -- Activity dates for streak calculation
           COALESCE(ad.activity_dates, ARRAY[]::DATE[]) AS activity_dates,
           
-          -- Question availability for freeze logic
-          COALESCE(
-            (SELECT array_agg(qa.date ORDER BY qa.date DESC) 
-             FROM question_availability qa 
-             WHERE qa.date >= CURRENT_DATE - INTERVAL '365 days'),
-            ARRAY[]::DATE[]
-          ) AS question_dates,
-          
           -- Assigned counts from Batch table
           b.hard_assigned,
           b.medium_assigned,
@@ -85,10 +69,19 @@ const syncLeaderboardData = async () => {
           
           -- Calculate all-time score
           ROUND(
-            (COALESCE(ss_all.hard_solved,0)::numeric / NULLIF(b.hard_assigned,0) * 20) +
-            (COALESCE(ss_all.medium_solved,0)::numeric / NULLIF(b.medium_assigned,0) * 15) +
-            (COALESCE(ss_all.easy_solved,0)::numeric / NULLIF(b.easy_assigned,0) * 10), 2
-          ) AS alltime_score
+            (COALESCE(ss_all.hard_solved,0)::numeric / NULLIF(b.hard_assigned,0) * 2000) +
+            (COALESCE(ss_all.medium_solved,0)::numeric / NULLIF(b.medium_assigned,0) * 1500) +
+            (COALESCE(ss_all.easy_solved,0)::numeric / NULLIF(b.easy_assigned,0) * 1000), 2
+          ) AS alltime_score,
+          
+          -- Completion status for freeze logic
+          CASE 
+            WHEN (COALESCE(ss_all.hard_solved,0) + COALESCE(ss_all.medium_solved,0) + COALESCE(ss_all.easy_solved,0)) >= 
+                 (b.hard_assigned + b.medium_assigned + b.easy_assigned)
+                 AND (b.hard_assigned + b.medium_assigned + b.easy_assigned) > 0
+            THEN true
+            ELSE false
+          END as completed_all_questions
           
         FROM "Student" s
         JOIN "Batch" b ON s.batch_id = b.id
@@ -105,12 +98,11 @@ const syncLeaderboardData = async () => {
           ROW_NUMBER() OVER (
             PARTITION BY batch_year
             ORDER BY alltime_score DESC, hard_completion DESC, medium_completion DESC, easy_completion DESC, total_solved DESC
-          ) AS alltime_global_rank,
+          ) as alltime_global_rank,
           ROW_NUMBER() OVER (
             PARTITION BY batch_year, city_name
             ORDER BY alltime_score DESC, hard_completion DESC, medium_completion DESC, easy_completion DESC, total_solved DESC
-          ) AS alltime_city_rank
-          
+          ) as alltime_city_rank
         FROM final_stats
       )
       
@@ -120,7 +112,7 @@ const syncLeaderboardData = async () => {
         medium_solved,
         easy_solved,
         activity_dates,
-        question_dates,
+        completed_all_questions,
         alltime_global_rank,
         alltime_city_rank
       FROM ranked_stats
@@ -129,18 +121,23 @@ const syncLeaderboardData = async () => {
             // Step 3: Bulk upsert new data with streak calculation
             if (result.length > 0) {
                 const insertStart = Date.now();
+                // DEBUG: Log result data
+                console.log(`🔍 DEBUG: result.length = ${result.length}`);
+                if (result.length > 0) {
+                    // Handle BigInt serialization
+                    const safeResult = JSON.parse(JSON.stringify(result[0], (key, value) => typeof value === 'bigint' ? value.toString() : value));
+                    console.log(`🔍 DEBUG: First row data:`, JSON.stringify(safeResult, null, 2));
+                }
                 const values = result.map((row) => {
-                    // Prepare question availability data
-                    const questionDates = row.question_dates || [];
-                    const questionAvailability = questionDates.map((date) => ({
-                        date,
-                        hasQuestion: true
-                    }));
-                    // Calculate streaks with freeze logic
+                    // Calculate streaks with completion-based freeze logic
                     const activityDates = row.activity_dates || [];
-                    const streaks = (0, streakCalculator_1.calculateStreakWithFreeze)(activityDates, questionAvailability);
+                    console.log(`🔍 DEBUG: Processing student ${row.student_id}, activity dates: ${activityDates.length}, completed_all_questions: ${row.completed_all_questions}`);
+                    const streaks = (0, streakCalculator_1.calculateStreakWithCompletionFreeze)(activityDates, row.student_id, row.completed_all_questions || false);
+                    console.log(`🔍 DEBUG: Calculated streaks for student ${row.student_id}:`, { currentStreak: streaks.currentStreak, maxStreak: streaks.maxStreak });
                     return `(${row.student_id}, ${row.hard_solved}, ${row.medium_solved}, ${row.easy_solved}, ${streaks.currentStreak}, ${streaks.maxStreak}, ${row.alltime_global_rank}, ${row.alltime_city_rank}, NOW())`;
                 }).join(',');
+                // DEBUG: Log the values string
+                console.log(`🔍 DEBUG: VALUES string:`, values);
                 await tx.$executeRawUnsafe(`
           INSERT INTO "Leaderboard" (
             student_id, hard_solved, medium_solved, easy_solved, 

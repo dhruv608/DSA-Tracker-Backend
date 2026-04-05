@@ -99,6 +99,7 @@ export const getTopicsWithBatchProgress = asyncHandler(async (req: Request, res:
   const topics = await getTopicsWithBatchProgressService({
     studentId,
     batchId,
+    query: req.query,
   });
 
   return res.json(topics);

@@ -167,23 +167,38 @@ const getAllQuestionsWithFiltersService = async ({ studentId, batchId, filters }
             uniqueQuestions.set(qv.question_id, qv.question);
         }
     });
-    // Get student's solved questions
+    // Get student's solved questions and bookmarks
     const questionIds = Array.from(uniqueQuestions.keys());
-    const studentProgress = await prisma_1.default.studentProgress.findMany({
-        where: {
-            student_id: studentId,
-            question_id: { in: questionIds }
-        },
-        select: {
-            question_id: true,
-            sync_at: true
-        }
-    });
+    const [studentProgress, studentBookmarks] = await Promise.all([
+        // Get solved questions
+        prisma_1.default.studentProgress.findMany({
+            where: {
+                student_id: studentId,
+                question_id: { in: questionIds }
+            },
+            select: {
+                question_id: true,
+                sync_at: true
+            }
+        }),
+        // Get bookmarked questions
+        prisma_1.default.bookmark.findMany({
+            where: {
+                student_id: studentId,
+                question_id: { in: questionIds }
+            },
+            select: {
+                question_id: true
+            }
+        })
+    ]);
     const solvedQuestionIds = new Set(studentProgress.map(progress => progress.question_id));
+    const bookmarkedQuestionIds = new Set(studentBookmarks.map(bookmark => bookmark.question_id));
     // Convert to array and apply filters
     let questions = Array.from(uniqueQuestions.values()).map((question) => ({
         ...question,
         isSolved: solvedQuestionIds.has(question.id),
+        isBookmarked: bookmarkedQuestionIds.has(question.id),
         syncAt: solvedQuestionIds.has(question.id)
             ? studentProgress.find(p => p.question_id === question.id)?.sync_at
             : null
