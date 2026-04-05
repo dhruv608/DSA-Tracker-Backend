@@ -19,7 +19,7 @@ cron.schedule("0 9,18,23 * * *", async () => {
         console.log(` Starting combined sync cycle (attempt ${attempt + 1}/${maxRetries})...`);
         
         // Step 1: Update student progress first
-        console.log(" Step 1: Syncing student progress...");
+        console.log("🎶🎶🎶🎶 Step 1: Syncing student progress...");
         const studentSyncStart = Date.now();
         await runStudentSyncWorker();
         const studentSyncDuration = Date.now() - studentSyncStart;
@@ -30,12 +30,16 @@ cron.schedule("0 9,18,23 * * *", async () => {
         const leaderboardSyncStart = Date.now();
         const leaderboardResult = await syncLeaderboardData();
         const leaderboardSyncDuration = Date.now() - leaderboardSyncStart;
-        console.log(` Leaderboard sync completed in ${leaderboardSyncDuration}ms`);
-        
+        console.log(`❤️❤️❤️❤️❤️❤️❤️ Leaderboard sync completed in ${leaderboardSyncDuration}ms`);
+
         const totalDuration = Date.now() - studentSyncStart;
-        console.log(` Combined sync cycle completed successfully in ${totalDuration}ms`);
-        console.log(`Processed ${leaderboardResult.studentsProcessed} students`);
+        console.log(`❤️❤️❤️❤️❤️❤️❤️ Combined sync cycle completed successfully in ${totalDuration}ms`);
+        console.log(`❤️❤️❤️❤️❤️❤️❤️ Processed ${leaderboardResult.studentsProcessed} students`);
         
+        // Stop server after sync completion
+        // console.log("Stopping server...");
+        // process.exit(0);
+
         // Success, exit retry loop
         break;
         

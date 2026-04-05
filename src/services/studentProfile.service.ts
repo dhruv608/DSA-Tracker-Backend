@@ -86,38 +86,35 @@ export const getStudentProfileService = async (studentId: number) => {
               AND DATE(sync_at) >= DATE(${oneYearAgo.toISOString().split('T')[0]})
             GROUP BY DATE(sync_at)
           ),
+          student_completion_stats AS (
+            SELECT 
+              COUNT(DISTINCT sp.question_id) as total_solved,
+              (b.hard_assigned + b.medium_assigned + b.easy_assigned) as total_assigned
+            FROM "StudentProgress" sp
+            JOIN "Student" s ON sp.student_id = s.id
+            JOIN "Batch" b ON s.batch_id = b.id
+            WHERE sp.student_id = ${studentId}
+          ),
           question_availability AS (
             SELECT 
               dr.date,
-              COALESCE(ss.submission_count, 0) as submissions,
+              COUNT(sp.question_id) as daily_solved,
+              scs.total_solved,
+              scs.total_assigned,
               CASE 
-                WHEN EXISTS (
-                  SELECT 1 
-                  FROM "Question" q
-                  JOIN "Topic" t ON q.topic_id = t.id
-                  JOIN "Class" c ON t.id = c.topic_id
-                  WHERE DATE(q.created_at) = dr.date
-                    AND c.batch_id = ${student.batch_id}
-                    AND (
-                      ${student.city?.id} IS NULL 
-                      OR EXISTS (
-                        SELECT 1 FROM "City" city 
-                        WHERE city.id = ${student.city?.id}
-                      )
-                    )
-                ) THEN true
+                WHEN scs.total_solved >= scs.total_assigned THEN true
                 ELSE false
-              END as has_question
+              END as completed_all_questions
             FROM date_range dr
-            LEFT JOIN student_submissions ss ON dr.date = ss.submission_date
-          )
+            LEFT JOIN "StudentProgress" sp ON DATE(sp.sync_at) = dr.date AND sp.student_id = ${studentId}
+            CROSS JOIN student_completion_stats scs
+          ),
           SELECT 
             date,
             CASE 
-              WHEN NOT has_question AND submissions = 0 THEN -1  -- Freeze day with no submissions
-              WHEN NOT has_question AND submissions > 0 THEN submissions  -- Freeze day but student solved previous questions
-              WHEN has_question AND submissions = 0 THEN 0     -- Questions available but no submissions (streak break)
-              ELSE submissions                -- Actual submission count
+              WHEN daily_solved > 0 THEN daily_solved
+              WHEN completed_all_questions THEN 0    -- Freeze day: completed all questions, no break
+              ELSE 0                           -- Break day: didn't solve anything and haven't completed all
             END as count
           FROM question_availability
           ORDER BY date DESC
@@ -133,17 +130,10 @@ export const getStudentProfileService = async (studentId: number) => {
       SELECT EXISTS(
         SELECT 1 
         FROM "Question" q
-        JOIN "Topic" t ON q.topic_id = t.id
-        JOIN "Class" c ON t.id = c.topic_id
-        WHERE DATE(q.created_at) = ${todayStr}
+        JOIN "QuestionVisibility" qv ON q.id = qv.question_id
+        JOIN "Class" c ON qv.class_id = c.id
+        WHERE DATE(qv.assigned_at) = ${todayStr}
         AND c.batch_id = ${student.batch_id}
-        AND (
-          ${student.city?.id} IS NULL 
-          OR EXISTS (
-            SELECT 1 FROM "City" city 
-            WHERE city.id = ${student.city?.id}
-          )
-        )
       ) as has_question
     ` as any[];
 

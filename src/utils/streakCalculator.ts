@@ -286,3 +286,91 @@ export function calculateStreakByActivity(activityDates: Date[]): StreakResult {
     maxStreak
   };
 }
+
+/**
+ * Calculate streak based on completion status
+ * A streak is maintained if:
+ * 1. Student solves at least one problem per day when they have pending questions
+ * 2. Student completed all assigned questions (freeze day - streak is preserved)
+ */
+export function calculateStreakWithCompletionFreeze(
+  activityDates: Date[], 
+  studentId: number,
+  hasCompletedAllQuestions: boolean
+): StreakResult {
+  if (activityDates.length === 0) {
+    return { currentStreak: 0, maxStreak: 0 };
+  }
+
+  // Sort dates in descending order (newest first)
+  const sortedDates = activityDates.sort((a, b) => b.getTime() - a.getTime());
+  
+  // Convert to date strings (YYYY-MM-DD) to compare days
+  const dateStrings = sortedDates.map(date => 
+    date.toISOString().split('T')[0]
+  );
+  
+  // Remove duplicates (same day multiple submissions)
+  const uniqueDates = [...new Set(dateStrings)];
+  
+  // Calculate current streak
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+  
+  const today = new Date().toISOString().split('T')[0];
+  let expectedDate = new Date(today);
+  
+  // Check current streak from today backwards
+  for (const dateStr of uniqueDates) {
+    const expectedDateStr = expectedDate.toISOString().split('T')[0];
+    
+    if (dateStr === expectedDateStr) {
+      currentStreak++;
+      expectedDate.setDate(expectedDate.getDate() - 1);
+    } else {
+      // No activity on expected day
+      if (hasCompletedAllQuestions) {
+        // Student completed all questions → FREEZE DAY
+        expectedDate.setDate(expectedDate.getDate() - 1);
+        continue;
+      } else {
+        // Student has pending questions → BREAK STREAK
+        break;
+      }
+    }
+  }
+  
+  // Calculate max streak by going through all dates
+  let previousDate: Date | null = null;
+  
+  for (let i = 0; i < uniqueDates.length; i++) {
+    const currentDate = new Date(uniqueDates[i]);
+    
+    if (previousDate === null) {
+      // Start new streak
+      tempStreak = 1;
+    } else {
+      const daysDiff = Math.floor((previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff === 1) {
+        // Consecutive day - continue streak
+        tempStreak++;
+      } else {
+        // Break in streak - reset and start new streak
+        maxStreak = Math.max(maxStreak, tempStreak);
+        tempStreak = 1;
+      }
+    }
+    
+    previousDate = currentDate;
+  }
+  
+  // Final check for max streak
+  maxStreak = Math.max(maxStreak, tempStreak);
+  
+  return {
+    currentStreak,
+    maxStreak
+  };
+}

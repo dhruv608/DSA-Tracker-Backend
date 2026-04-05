@@ -172,7 +172,7 @@ export const getLeaderboardWithPagination = async (filters: any, pagination: any
             JOIN "City" c ON c.id = s.city_id
             JOIN "Leaderboard" l ON l.student_id = s.id
             ${whereClause}
-            ORDER BY ${globalRankField}
+            ORDER BY ${city && city !== "all" ? cityRankField : globalRankField}
             LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
 
