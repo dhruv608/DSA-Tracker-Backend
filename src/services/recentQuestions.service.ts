@@ -2,22 +2,43 @@ import prisma from "../config/prisma";
 
 interface GetRecentQuestionsInput {
   batchId: number;
-  days?: number;
+  date?: string; // Format: YYYY-MM-DD
 }
 
 export const getRecentQuestionsService = async ({
   batchId,
-  days = 7
+  date
 }: GetRecentQuestionsInput) => {
   
-  // Get recently assigned questions for this batch
+  // Calculate date range for the specific date
+  let startDate: Date;
+  let endDate: Date;
+  
+  if (date) {
+    // Parse the provided date (YYYY-MM-DD format)
+    const parsedDate = new Date(date + 'T00:00:00.000Z');
+    startDate = new Date(parsedDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(parsedDate);
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    // Default to today if no date provided
+    const today = new Date();
+    startDate = new Date(today);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+  }
+  
+  // Get questions assigned for this specific date
   const recentQuestions = await prisma.questionVisibility.findMany({
     where: {
       class: {
         batch_id: batchId
       },
       assigned_at: {
-        gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) // days ago
+        gte: startDate,
+        lte: endDate
       }
     },
     include: {
