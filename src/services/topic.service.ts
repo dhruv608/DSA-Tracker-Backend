@@ -519,8 +519,8 @@ export const getTopicOverviewWithClassesSummaryService = async ({
   const limit = parseInt(query?.limit as string) || 10;
   const offset = (page - 1) * limit;
 
-  // Get topic with paginated classes (clean query without _count)
-  console.time(`[${requestId}] Query: Fetch Topic + Paginated Classes`);
+  // Get topic basic info first
+  console.time(`[${requestId}] Query: Fetch Topic Info`);
   const topic = await prisma.topic.findFirst({
     where: { slug: topicSlug },
     select: {
@@ -528,115 +528,74 @@ export const getTopicOverviewWithClassesSummaryService = async ({
       topic_name: true,
       slug: true,
       description: true,
-      photo_url: true,
-      classes: {
-        where: { batch_id: batchId },
-        select: {
-          id: true,
-          class_name: true,
-          slug: true,
-          description: true,
-          pdf_url: true,
-          class_date: true,
-          created_at: true
-        },
-        orderBy: { created_at: 'asc' },
-        skip: offset,
-        take: limit
-      }
+      photo_url: true
     }
   });
-  console.timeEnd(`[${requestId}] Query: Fetch Topic + Paginated Classes`);
+  console.timeEnd(`[${requestId}] Query: Fetch Topic Info`);
 
   if (!topic) {
     throw new ApiError(HTTP_STATUS.NOT_FOUND, "Topic not found");
   }
 
-  // Get total classes count for pagination metadata (optimized - no OFFSET)
-  console.time(`[${requestId}] Query: Count Total Classes`);
-  const totalClassesCount = await prisma.class.count({
-    where: { topic_id: topic.id, batch_id: batchId }
-  });
-  console.timeEnd(`[${requestId}] Query: Count Total Classes`);
-
-  // Get ALL questionVisibility data in ONE query for paginated classes
-  const paginatedClassIds = topic.classes.map(cls => cls.id);
-  console.time(`[${requestId}] Query: Fetch QuestionVisibility (SINGLE)`);
-  const questionVisibilityRecords = await prisma.questionVisibility.findMany({
-    where: { class_id: { in: paginatedClassIds } },
-    select: { class_id: true, question_id: true }
-  });
-  console.timeEnd(`[${requestId}] Query: Fetch QuestionVisibility (SINGLE)`);
-
-  // Process questionVisibility data in JavaScript (no duplicate queries)
-  console.time(`[${requestId}] Processing: Build Maps`);
-  const questionIdsByClass = new Map<number, number[]>();
-  const questionCountMap = new Map<number, number>();
-  
-  questionVisibilityRecords.forEach(qv => {
-    // Group question IDs by class
-    if (!questionIdsByClass.has(qv.class_id)) {
-      questionIdsByClass.set(qv.class_id, []);
-    }
-    questionIdsByClass.get(qv.class_id)!.push(qv.question_id);
-    
-    // Count questions per class
-    questionCountMap.set(qv.class_id, (questionCountMap.get(qv.class_id) || 0) + 1);
-  });
-
-  const allQuestionIds = Array.from(new Set(questionVisibilityRecords.map(qv => qv.question_id)));
-  console.timeEnd(`[${requestId}] Processing: Build Maps`);
-
-  // Fetch student progress only for questions in paginated classes
-  console.time(`[${requestId}] Query: Fetch Student Progress`);
-  const studentProgress = await prisma.studentProgress.findMany({
-    where: { student_id: studentId, question_id: { in: allQuestionIds } },
-    select: { question_id: true }
-  });
-  console.timeEnd(`[${requestId}] Query: Fetch Student Progress`);
-
-  // Create Set of solved question IDs
-  const solvedQuestionIds = new Set(studentProgress.map(progress => progress.question_id));
-
-  // Format classes with summary data
-  console.time(`[${requestId}] Processing: Format Classes`);
-  const classesSummary = topic.classes.map((cls: any) => {
-    const classQuestionIds = questionIdsByClass.get(cls.id) || [];
-    const totalQuestions = questionCountMap.get(cls.id) || 0;
-    const solvedQuestions = classQuestionIds.filter(questionId =>
-      solvedQuestionIds.has(questionId)
-    ).length;
-
-    return {
-      id: cls.id,
-      class_name: cls.class_name,
-      slug: cls.slug,
-      description: cls.description,
-      pdf_url: cls.pdf_url,
-      classDate: cls.class_date,
-      totalQuestions,
-      solvedQuestions
-    };
-  });
-  console.timeEnd(`[${requestId}] Processing: Format Classes`);
-
-  // Calculate overall topic progress using single optimized query
-  console.time(`[${requestId}] Query: Overall Progress`);
-  const topicProgressData = await prisma.$queryRaw`
+  // SINGLE QUERY: Get paginated classes with aggregated data
+  console.time(`[${requestId}] Query: Combined Classes + Progress Data`);
+  const classesData = await prisma.$queryRaw`
     SELECT 
-      COUNT(DISTINCT q.id) as total_questions,
-      COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END) as solved_questions
+      c.id,
+      c.class_name,
+      c.slug,
+      c.description,
+      c.pdf_url,
+      c.class_date,
+      c.created_at,
+      COUNT(DISTINCT qv.question_id) as total_questions,
+      COUNT(DISTINCT CASE WHEN sp.question_id IS NOT NULL THEN qv.question_id END) as solved_questions
     FROM "Class" c
     LEFT JOIN "QuestionVisibility" qv ON c.id = qv.class_id
-    LEFT JOIN "Question" q ON qv.question_id = q.id
+    LEFT JOIN "StudentProgress" sp ON qv.question_id = sp.question_id AND sp.student_id = ${studentId}
+    WHERE c.topic_id = ${topic.id} AND c.batch_id = ${batchId}
+    GROUP BY c.id, c.class_name, c.slug, c.description, c.pdf_url, c.class_date, c.created_at
+    ORDER BY c.created_at ASC
+    LIMIT ${limit} OFFSET ${offset}
+  ` as any[];
+  console.timeEnd(`[${requestId}] Query: Combined Classes + Progress Data`);
+
+  // SINGLE QUERY: Get total classes count and overall progress
+  console.time(`[${requestId}] Query: Total Classes + Overall Progress`);
+  const overallData = await prisma.$queryRaw`
+    SELECT 
+      COUNT(DISTINCT c.id) as total_classes,
+      COUNT(DISTINCT q.id) as total_questions,
+      COUNT(DISTINCT sp.question_id) as solved_questions
+    FROM "Class" c
+    INNER JOIN "QuestionVisibility" qv ON c.id = qv.class_id
+    INNER JOIN "Question" q ON qv.question_id = q.id
     LEFT JOIN "StudentProgress" sp ON q.id = sp.question_id AND sp.student_id = ${studentId}
     WHERE c.topic_id = ${topic.id} AND c.batch_id = ${batchId}
   ` as any[];
-  console.timeEnd(`[${requestId}] Query: Overall Progress`);
+  console.timeEnd(`[${requestId}] Query: Total Classes + Overall Progress`);
 
-  const totalTopicQuestions = Number(topicProgressData[0]?.total_questions) || 0;
-  const totalSolvedQuestions = Number(topicProgressData[0]?.solved_questions) || 0;
+  console.time(`[${requestId}] Processing: Format Response`);
+  
+  // Format classes data
+  const classesSummary = classesData.map((cls: any) => ({
+    id: cls.id,
+    class_name: cls.class_name,
+    slug: cls.slug,
+    description: cls.description,
+    pdf_url: cls.pdf_url,
+    classDate: cls.class_date,
+    totalQuestions: Number(cls.total_questions) || 0,
+    solvedQuestions: Number(cls.solved_questions) || 0
+  }));
 
+  // Extract overall progress data
+  const overall = overallData[0] || {};
+  const totalClassesCount = Number(overall.total_classes) || 0;
+  const totalTopicQuestions = Number(overall.total_questions) || 0;
+  const totalSolvedQuestions = Number(overall.solved_questions) || 0;
+
+  console.timeEnd(`[${requestId}] Processing: Format Response`);
   console.timeEnd(`[${requestId}] API /topics/:topicSlug TOTAL`);
   console.log(`[${requestId}] END: getTopicOverviewWithClassesSummaryService`);
 
