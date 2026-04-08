@@ -4,57 +4,6 @@ import { validatePasswordForAuth } from "../utils/passwordValidator.util";
 import { AdminRole } from "@prisma/client";
 import { ApiError } from "../utils/ApiError";
 
-export const getCityWiseStats = async () => {
-    try {
-        const cities = await prisma.city.findMany({
-            include: {
-                batches: {
-                    select: {
-                        id: true,
-                        _count: {
-                            select: {
-                                students: true
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        const cityWiseDistribution = await Promise.all(
-            cities.map(async (city) => {
-                const batchIds = city.batches.map((batch: any) => batch.id);
-                
-                const [activeBatches, totalStudents] = await Promise.all([
-                    prisma.batch.count({
-                        where: {
-                            city_id: city.id,
-                            id: { in: batchIds }
-                        }
-                    }),
-                    prisma.student.count({
-                        where: {
-                            batch_id: { in: batchIds }
-                        }
-                    })
-                ]);
-
-                return {
-                    cityId: city.id,
-                    cityName: city.city_name,
-                    activeBatches,
-                    totalStudents,
-                    status: "Active"
-                };
-            })
-        );
-
-        return cityWiseDistribution;
-    } catch (error) {
-        console.error("City-wise stats error:", error);
-        throw error;
-    }
-};
 
 export const createAdminService = async (adminData: any) => {
     try {

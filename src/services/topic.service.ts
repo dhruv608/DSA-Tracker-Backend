@@ -348,10 +348,6 @@ export const getTopicsWithBatchProgressService = async ({
   const sortBy = query?.sortBy || 'recent';
   const offset = (page - 1) * limit;
 
-  // Build search condition
-  const searchCondition = search ? `AND (LOWER(t.topic_name) ILIKE LOWER(?) OR LOWER(t.slug) ILIKE LOWER(?))` : '';
-  const searchParams = search ? [`%${search}%`, `%${search}%`] : [];
-
   // Build ORDER BY clause safely
   let orderByClause = 'ORDER BY last_class_created_at DESC NULLS LAST';
   if (sortBy === 'oldest') {
@@ -366,59 +362,95 @@ export const getTopicsWithBatchProgressService = async ({
     orderByClause = 'ORDER BY progress_percentage ASC NULLS LAST, t.created_at DESC';
   }
 
-  // Main query with all aggregations
-  const topicsQuery = `
-    SELECT 
-      t.id,
-      t.topic_name,
-      t.slug,
-      t.photo_url,
-      t.created_at,
-      t.updated_at,
-      COUNT(DISTINCT c.id) as class_count,
-      COUNT(DISTINCT q.id) as question_count,
-      COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END) as solved_questions,
-      MAX(c.created_at) as last_class_created_at,
-      CASE 
-        WHEN COUNT(DISTINCT q.id) = 0 THEN 0
-        ELSE ROUND((COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END)::float / COUNT(DISTINCT q.id)) * 100)
-      END as progress_percentage
-    FROM "Topic" t
-    LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
-    LEFT JOIN "QuestionVisibility" qv ON c.id = qv.class_id
-    LEFT JOIN "Question" q ON qv.question_id = q.id
-    LEFT JOIN "StudentProgress" sp ON q.id = sp.question_id AND sp.student_id = $2
-    WHERE 1=1 ${searchCondition}
-    GROUP BY t.id, t.topic_name, t.slug, t.photo_url, t.created_at, t.updated_at
-    ${orderByClause}
-    LIMIT $3 OFFSET $4
-  `;
+  // Build queries dynamically based on search presence
+  const searchParams: (string | number)[] = [batchId, studentId];
+  const countParams: (string | number)[] = [batchId];
 
-  // Count query for pagination metadata
-  const countQuery = `
-    SELECT COUNT(DISTINCT t.id) as total_count
-    FROM "Topic" t
-    LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
-    WHERE 1=1 ${searchCondition}
-  `;
+  let topicsQuery: string;
+  let countQuery: string;
+
+  if (search) {
+    // With search: $1=batchId, $2=studentId, $3=searchName, $4=searchSlug, $5=limit, $6=offset
+    const searchPattern = `%${search}%`;
+    searchParams.push(searchPattern, searchPattern, limit, offset);
+    countParams.push(searchPattern, searchPattern);
+
+    topicsQuery = `
+      SELECT 
+        t.id,
+        t.topic_name,
+        t.slug,
+        t.photo_url,
+        t.created_at,
+        t.updated_at,
+        COUNT(DISTINCT c.id) as class_count,
+        COUNT(DISTINCT q.id) as question_count,
+        COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END) as solved_questions,
+        MAX(c.created_at) as last_class_created_at,
+        CASE 
+          WHEN COUNT(DISTINCT q.id) = 0 THEN 0
+          ELSE ROUND((COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END)::float / COUNT(DISTINCT q.id)) * 100)
+        END as progress_percentage
+      FROM "Topic" t
+      LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
+      LEFT JOIN "QuestionVisibility" qv ON c.id = qv.class_id
+      LEFT JOIN "Question" q ON qv.question_id = q.id
+      LEFT JOIN "StudentProgress" sp ON q.id = sp.question_id AND sp.student_id = $2
+      WHERE 1=1 AND (t.topic_name ILIKE $3 OR t.slug ILIKE $4)
+      GROUP BY t.id, t.topic_name, t.slug, t.photo_url, t.created_at, t.updated_at
+      ${orderByClause}
+      LIMIT $5 OFFSET $6
+    `;
+
+    countQuery = `
+      SELECT COUNT(DISTINCT t.id) as total_count
+      FROM "Topic" t
+      LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
+      WHERE 1=1 AND (t.topic_name ILIKE $2 OR t.slug ILIKE $3)
+    `;
+  } else {
+    // Without search: $1=batchId, $2=studentId, $3=limit, $4=offset
+    searchParams.push(limit, offset);
+
+    topicsQuery = `
+      SELECT 
+        t.id,
+        t.topic_name,
+        t.slug,
+        t.photo_url,
+        t.created_at,
+        t.updated_at,
+        COUNT(DISTINCT c.id) as class_count,
+        COUNT(DISTINCT q.id) as question_count,
+        COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END) as solved_questions,
+        MAX(c.created_at) as last_class_created_at,
+        CASE 
+          WHEN COUNT(DISTINCT q.id) = 0 THEN 0
+          ELSE ROUND((COUNT(DISTINCT CASE WHEN sp.student_id IS NOT NULL THEN q.id END)::float / COUNT(DISTINCT q.id)) * 100)
+        END as progress_percentage
+      FROM "Topic" t
+      LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
+      LEFT JOIN "QuestionVisibility" qv ON c.id = qv.class_id
+      LEFT JOIN "Question" q ON qv.question_id = q.id
+      LEFT JOIN "StudentProgress" sp ON q.id = sp.question_id AND sp.student_id = $2
+      WHERE 1=1
+      GROUP BY t.id, t.topic_name, t.slug, t.photo_url, t.created_at, t.updated_at
+      ${orderByClause}
+      LIMIT $3 OFFSET $4
+    `;
+
+    countQuery = `
+      SELECT COUNT(DISTINCT t.id) as total_count
+      FROM "Topic" t
+      LEFT JOIN "Class" c ON t.id = c.topic_id AND c.batch_id = $1
+      WHERE 1=1
+    `;
+  }
 
   try {
-    // Execute main query with parameters
-    const topics = await prisma.$queryRawUnsafe(
-      topicsQuery,
-      batchId,
-      studentId,
-      ...searchParams,
-      limit,
-      offset
-    ) as any[];
-
-    // Execute count query
-    const countResult = await prisma.$queryRawUnsafe(
-      countQuery,
-      batchId,
-      ...searchParams
-    ) as any[];
+    // Execute queries
+    const topics = await prisma.$queryRawUnsafe(topicsQuery, ...searchParams) as any[];
+    const countResult = await prisma.$queryRawUnsafe(countQuery, ...countParams) as any[];
 
     const totalCount = Number(countResult[0]?.total_count) || 0;
 

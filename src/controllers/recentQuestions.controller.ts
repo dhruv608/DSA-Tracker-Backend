@@ -7,7 +7,7 @@ export const getRecentQuestions = asyncHandler(async (req: Request, res: Respons
           try {
             // Get batch info from middleware (extractStudentInfo)
             const batchId = (req as any).batchId;
-            const { date } = req.query;
+            const { date, page, limit } = req.query;
 
             if (!batchId) {
               throw new ApiError(401, "Student authentication required", [], "UNAUTHORIZED");
@@ -21,28 +21,31 @@ export const getRecentQuestions = asyncHandler(async (req: Request, res: Respons
               if (!dateRegex.test(dateStr)) {
                 throw new ApiError(400, "Date parameter must be in YYYY-MM-DD format", [], "INVALID_INPUT");
               }
-              
+
               // Validate if it's a valid date
               const parsedDate = new Date(dateStr);
               if (isNaN(parsedDate.getTime())) {
                 throw new ApiError(400, "Invalid date provided", [], "INVALID_INPUT");
               }
-              
+
               dateParam = dateStr;
             }
 
-            const questions = await getRecentQuestionsService({
+            // Parse pagination params
+            const pageParam = page ? parseInt(page as string, 10) : undefined;
+            const limitParam = limit ? parseInt(limit as string, 10) : undefined;
+
+            const result = await getRecentQuestionsService({
               batchId,
-              date: dateParam
+              date: dateParam,
+              page: pageParam,
+              limit: limitParam
             });
 
-            return res.json({
-              questions,
-              total: questions.length
-            });
+            return res.json(result);
 
           } catch (error: any) {
-    if (error instanceof ApiError) throw error;
+            if (error instanceof ApiError) throw error;
             throw new ApiError(500, error.message || "Failed to fetch recent questions", [], "INTERNAL_SERVER_ERROR");
           }
         });

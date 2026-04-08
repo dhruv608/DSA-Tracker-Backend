@@ -3,17 +3,25 @@ import prisma from "../config/prisma";
 interface GetRecentQuestionsInput {
   batchId: number;
   date?: string; // Format: YYYY-MM-DD
+  page?: number;
+  limit?: number;
 }
+
+// Default pagination settings - hardcoded in service
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 12; // 10-12 items per page as requested
 
 export const getRecentQuestionsService = async ({
   batchId,
-  date
+  date,
+  page = DEFAULT_PAGE,
+  limit = DEFAULT_LIMIT
 }: GetRecentQuestionsInput) => {
-  
+
   // Calculate date range for the specific date
   let startDate: Date;
   let endDate: Date;
-  
+
   if (date) {
     // Parse the provided date (YYYY-MM-DD format)
     const parsedDate = new Date(date + 'T00:00:00.000Z');
@@ -29,8 +37,24 @@ export const getRecentQuestionsService = async ({
     endDate = new Date(today);
     endDate.setHours(23, 59, 59, 999);
   }
-  
-  // Get questions assigned for this specific date
+
+  // Calculate skip for pagination
+  const skip = (page - 1) * limit;
+
+  // Get total count for pagination metadata (using queryRaw for distinct count)
+  const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(DISTINCT question_id) as count
+    FROM "QuestionVisibility"
+    WHERE assigned_at >= ${startDate}
+      AND assigned_at <= ${endDate}
+      AND class_id IN (
+        SELECT id FROM "Class" WHERE batch_id = ${batchId}
+      )
+  `;
+  const totalCount = Number(countResult[0]?.count || 0);
+
+  // Get paginated questions from database using Prisma skip/take
+  // This prevents loading all questions into memory
   const recentQuestions = await prisma.questionVisibility.findMany({
     where: {
       class: {
@@ -60,11 +84,13 @@ export const getRecentQuestionsService = async ({
     orderBy: {
       assigned_at: 'desc'
     },
-    distinct: ['question_id'] // Avoid duplicate questions
+    distinct: ['question_id'],
+    skip,  // Prisma skip - database level pagination
+    take: limit // Prisma take - only fetch requested items
   });
 
   // Format response
-  return recentQuestions.map((qv) => ({
+  const questions = recentQuestions.map((qv) => ({
     question_id: qv.question.id,
     question_name: qv.question.question_name,
     difficulty: qv.question.level,
@@ -72,4 +98,16 @@ export const getRecentQuestionsService = async ({
     class_slug: qv.class.slug,
     assigned_at: qv.assigned_at
   }));
+
+  return {
+    questions,
+    pagination: {
+      page,
+      limit,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      hasNext: page < Math.ceil(totalCount / limit),
+      hasPrev: page > 1
+    }
+  };
 };
