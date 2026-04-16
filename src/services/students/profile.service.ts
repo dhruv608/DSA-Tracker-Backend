@@ -1,6 +1,8 @@
 import prisma from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CacheInvalidation } from "../../utils/cacheInvalidation";
+import redis from "../../config/redis";
+import { buildCacheKey } from "../../utils/redisUtils";
 
 export const updateStudentProfileData = async (
   studentId: number,
@@ -9,7 +11,7 @@ export const updateStudentProfileData = async (
   // Get current student to check if they already have city and batch
   const currentStudent = await prisma.student.findUnique({
     where: { id: studentId },
-    select: { city_id: true, batch_id: true }
+    select: { city_id: true, batch_id: true, username: true }
   });
 
   if (!currentStudent) {
@@ -45,6 +47,21 @@ export const updateStudentProfileData = async (
 
   // Invalidate leaderboard caches when student profile data changes
   await CacheInvalidation.invalidateAllLeaderboards();
+  
+  // Invalidate student:me cache
+  const meCacheKey = buildCacheKey(`student:me:${studentId}`, {});
+  await redis.del(meCacheKey);
+  
+  // Invalidate student profile cache
+  await CacheInvalidation.invalidateStudentProfile(studentId);
+  
+  // Invalidate public profile cache for old username if username changed
+  if (username && username !== currentStudent.username) {
+    await redis.del(`student:profile:public:${currentStudent.username}`);
+  }
+  
+  // Invalidate heatmap cache
+  await redis.del(`student:heatmap:${studentId}:*`);
 
   return updated;
 };

@@ -133,6 +133,17 @@ export const updateStudentDetailsService = async (id: number, body: StudentUpdat
         // Invalidate getCurrentStudent cache
         const cacheKey = buildCacheKey(`student:me:${id}`, {});
         await redis.del(cacheKey);
+        
+        // Invalidate student profile cache
+        await CacheInvalidation.invalidateStudentProfile(id);
+        
+        // Invalidate public profile cache for old username if username changed
+        if (updateData.username && updateData.username !== student.username) {
+          await redis.del(`student:profile:public:${student.username}`);
+        }
+        
+        // Invalidate heatmap cache
+        await redis.del(`student:heatmap:${id}:*`);
 
         return updatedStudent;
 

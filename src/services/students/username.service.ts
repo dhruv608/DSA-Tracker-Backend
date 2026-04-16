@@ -7,6 +7,9 @@
 import prisma from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { UsernameCheckParams, CheckUsernameAvailabilityResponse } from '../../types/student.types';
+import { CacheInvalidation } from "../../utils/cacheInvalidation";
+import redis from "../../config/redis";
+import { buildCacheKey } from "../../utils/redisUtils";
 
 /**
  * Check if username is available for registration or update
@@ -68,6 +71,12 @@ export const updateUsernameService = async (
     throw new ApiError(409, "Username already taken", [], "USERNAME_TAKEN");
   }
 
+  // Get old username before update
+  const oldStudent = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { username: true }
+  });
+
   // Update username
   const updatedStudent = await prisma.student.update({
     where: { id: studentId },
@@ -86,6 +95,24 @@ export const updateUsernameService = async (
       created_at: true
     }
   });
+
+  // Invalidate caches when username changes
+  await CacheInvalidation.invalidateAllLeaderboards();
+  
+  // Invalidate student:me cache
+  const meCacheKey = buildCacheKey(`student:me:${studentId}`, {});
+  await redis.del(meCacheKey);
+  
+  // Invalidate student profile cache
+  await CacheInvalidation.invalidateStudentProfile(studentId);
+  
+  // Invalidate public profile cache for old username
+  if (oldStudent?.username) {
+    await redis.del(`student:profile:public:${oldStudent.username}`);
+  }
+  
+  // Invalidate heatmap cache
+  await redis.del(`student:heatmap:${studentId}:*`);
 
   return updatedStudent;
 };

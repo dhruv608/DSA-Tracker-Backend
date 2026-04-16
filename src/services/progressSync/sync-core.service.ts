@@ -4,6 +4,8 @@ import { fetchGfgData } from "../external/gfg.service";
 import { ApiError } from "../../utils/ApiError";
 import { extractSlug } from "./sync-utils.service";
 import { CacheInvalidation } from "../../utils/cacheInvalidation";
+import redis from "../../config/redis";
+import { buildCacheKey } from "../../utils/redisUtils";
 
 interface BatchQuestionData {
   question_ids: number[];
@@ -195,6 +197,10 @@ export async function syncOneStudent(
     await CacheInvalidation.invalidateStudentProfile(studentId); // Student profile affected
     await CacheInvalidation.invalidateAllStudentProfiles(); // All profiles (ranks changed)
     await CacheInvalidation.invalidateAllLeaderboards(); // Leaderboard ranks change
+    
+    // Invalidate student:me cache
+    const meCacheKey = buildCacheKey(`student:me:${studentId}`, {});
+    await redis.del(meCacheKey);
   } else {
   }
 

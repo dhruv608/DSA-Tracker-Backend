@@ -3,6 +3,9 @@ import { StudentRequest } from '../middlewares/student.middleware';
 import { ProfileImageService } from '../services/students/profileImage.service';
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/ApiError";
+import { CacheInvalidation } from "../utils/cacheInvalidation";
+import redis from "../config/redis";
+import { buildCacheKey } from "../utils/redisUtils";
 
 export const uploadProfileImage = asyncHandler(async (req: StudentRequest, res: Response) => {
           try {
@@ -17,6 +20,14 @@ export const uploadProfileImage = asyncHandler(async (req: StudentRequest, res: 
             }
 
             const result = await ProfileImageService.uploadProfileImage(studentId, req.file);
+
+            // Invalidate all profile-related caches for this student
+            await CacheInvalidation.invalidateStudentProfile(studentId);
+            // Invalidate student:me cache
+            const meCacheKey = buildCacheKey(`student:me:${studentId}`, {});
+            await redis.del(meCacheKey);
+            // Invalidate heatmap cache
+            await redis.del(`student:heatmap:${studentId}:*`);
 
             res.status(201).json({
               success: true,
@@ -43,6 +54,14 @@ export const deleteProfileImage = asyncHandler(async (req: StudentRequest, res: 
             }
 
             await ProfileImageService.deleteProfileImage(studentId);
+
+            // Invalidate all profile-related caches for this student
+            await CacheInvalidation.invalidateStudentProfile(studentId);
+            // Invalidate student:me cache
+            const meCacheKey = buildCacheKey(`student:me:${studentId}`, {});
+            await redis.del(meCacheKey);
+            // Invalidate heatmap cache
+            await redis.del(`student:heatmap:${studentId}:*`);
 
             res.json({
               success: true,
