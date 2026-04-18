@@ -62,10 +62,12 @@ export const getAssignedQuestionsOfClass = asyncHandler(async (
     search: pagination.search || '',
   });
 
+
   return res.json({
     message: "Assigned questions retrieved successfully",
     data: assigned.data,
     pagination: assigned.pagination,
+    classDetails: assigned.classDetails,
   });
 });
 
