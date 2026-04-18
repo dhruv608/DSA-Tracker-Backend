@@ -31,8 +31,9 @@ export const updateTopicSchema = z.object({
  */
 export const createClassSchema = z.object({
   class_name: z.string().min(1, "Class name is required"),
-  duration: z.string().optional(),
+  duration_minutes: z.string().optional(),
   description: z.string().optional(),
+  pdf_url: z.string().optional(),
 });
 
 /**
@@ -41,8 +42,9 @@ export const createClassSchema = z.object({
  */
 export const updateClassSchema = z.object({
   class_name: z.string().min(1, "Class name is required").optional(),
-  duration: z.string().optional(),
+  duration_minutes: z.string().optional(),
   description: z.string().optional(),
+  pdf_url: z.string().optional(),
 });
 
 /**
